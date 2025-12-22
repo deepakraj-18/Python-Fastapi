@@ -1,0 +1,11 @@
+{
+  "application": {
+    "name": "Document Generator API",
+    "version": "2.0.0",
+    "description": "Dynamic document generation with SharePoint integration"
+  },
+  "paths": {
+    "templates": "/Templates",
+    "output": "/Output"
+  }
+}
