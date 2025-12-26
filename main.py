@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from models.requestmodel import GenerateDocumentRequest
 from models.responsemodel import GenerateDocumentResponse, SharePointMetadata
@@ -8,6 +9,15 @@ app = FastAPI(
     title="Document Generator API",
     description="API for generating and updating Word documents with dynamic content from SharePoint templates",
     version="2.0.0"
+)
+
+# Add CORS middleware to allow requests from all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Allows all headers
 )
 
 @app.post("/api/generatedocument", 
