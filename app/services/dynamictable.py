@@ -132,31 +132,93 @@ def _generate_phase_based_table(doc: Document, rows: List[Dict[str, Any]], color
     return table
 
 def _generate_custom_table(doc: Document, headers: List[str], rows: List[Dict[str, Any]], color_map: Dict[str, str], header_color: str, legend: List[Dict[str, str]]):
-    table = doc.add_table(rows=0, cols=len(headers))
+    # Extract month headers from the first row's months array if it exists
+    dynamic_headers = []
+    static_columns = []
+    
+    if rows and 'months' in rows[0]:
+        # Get static columns (all except 'months')
+        static_columns = [key for key in rows[0].keys() if key != 'months']
+        
+        # Extract month names from the months array
+        months_data = rows[0].get('months', [])
+        for month_obj in months_data:
+            # Each month_obj is like: { "Nov-26": { phase: "...", value: "..." } }
+            month_name = list(month_obj.keys())[0] if month_obj else None
+            if month_name:
+                dynamic_headers.append(month_name)
+        
+        # Final headers: static columns first, then month columns
+        if headers:
+            # Use provided headers if any
+            all_headers = headers
+        else:
+            # Build headers from static columns + month names
+            all_headers = static_columns + dynamic_headers
+    else:
+        # Use provided headers or extract from row keys
+        all_headers = headers if headers else list(rows[0].keys())
+    
+    table = doc.add_table(rows=0, cols=len(all_headers))
     table.style = "Table Grid"
     
     # Add header row
     header_row = table.add_row().cells
-    for i, header in enumerate(headers):
+    for i, header in enumerate(all_headers):
         header_row[i].text = str(header)
         set_cell_shading(header_row[i], header_color)
         set_cell_text_bold(header_row[i])
     
+    # Add data rows
     for row_data in rows:
         data_row = table.add_row().cells
-        for i, header in enumerate(headers):
-            cell_data = row_data.get(header, '')
+        
+        if 'months' in row_data:
+            # Process row with months array - use header order
+            months_array = row_data.get('months', [])
+            months_dict = {}
             
-            if isinstance(cell_data, dict):
-                cell_value = cell_data.get('value', '')
-                cell_phase = cell_data.get('phase', '')
-                cell_color = color_map.get(cell_phase, None)
+            # Convert months array to dictionary for easy lookup
+            for month_obj in months_array:
+                if month_obj:
+                    month_name = list(month_obj.keys())[0]
+                    months_dict[month_name] = month_obj[month_name]
+            
+            # Process each column according to all_headers order
+            for col_index, header in enumerate(all_headers):
+                # Check if this header is a month column
+                if header in months_dict:
+                    month_data = months_dict[header]
+                    
+                    if isinstance(month_data, dict):
+                        cell_value = month_data.get('value', '')
+                        cell_phase = month_data.get('phase', '')
+                        cell_color = color_map.get(cell_phase, None)
+                        
+                        data_row[col_index].text = str(cell_value)
+                        if cell_color:
+                            set_cell_shading(data_row[col_index], cell_color)
+                    else:
+                        data_row[col_index].text = str(month_data)
+                else:
+                    # It's a static column (Sl. No., Staff, Total, etc.)
+                    cell_value = row_data.get(header, '')
+                    data_row[col_index].text = str(cell_value)
+        else:
+            # Process row without months array (backward compatibility)
+            for i, header in enumerate(all_headers):
+                cell_data = row_data.get(header, '')
                 
-                data_row[i].text = str(cell_value)
-                if cell_color:
-                    set_cell_shading(data_row[i], cell_color)
-            else:
-                data_row[i].text = str(cell_data)
+                if isinstance(cell_data, dict):
+                    cell_value = cell_data.get('value', '')
+                    cell_phase = cell_data.get('phase', '')
+                    cell_color = color_map.get(cell_phase, None)
+                    
+                    data_row[i].text = str(cell_value)
+                    if cell_color:
+                        set_cell_shading(data_row[i], cell_color)
+                else:
+                    data_row[i].text = str(cell_data)
     
     # Add legend if provided
     if legend:

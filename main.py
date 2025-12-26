@@ -10,10 +10,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-@app.get("/")
-def read_root():
-    return {"message": "FastAPI is running on Azure hi!"}
-
 @app.post("/api/generatedocument", 
          response_model=GenerateDocumentResponse,
          summary="Generate or update Word document",
