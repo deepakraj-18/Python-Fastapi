@@ -62,9 +62,6 @@ def detect_table_format(rows: List[Dict[str, Any]], headers: Optional[List[str]]
     return 'simple'
 
 def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Document:
-    import logging
-    logger = logging.getLogger(__name__)
-    
     headers = data.get("headers", [])
     rows = data.get("rows", [])
     colors = data.get("colors", [])
@@ -80,10 +77,7 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
     
     sdt = find_sdt_by_title(doc, tag)
     if sdt is None:
-        logger.error(f"Content control with tag '{tag}' not found in document")
         return doc
-    
-    logger.info(f"Found SDT with tag: {tag}")
     
     sdt_content = None
     for el in sdt.iter():
@@ -92,7 +86,6 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
             break
     
     if sdt_content is None:
-        logger.error(f"sdtContent not found within SDT with tag '{tag}'")
         return doc
     
     for child in list(sdt_content):
@@ -105,9 +98,7 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
     else:
         table = _generate_simple_table(doc, rows, color_map, header_color)
     
-    logger.info(f"Table generated with {len(table.rows)} rows, appending to SDT content")
     sdt_content.append(table._tbl)
-    logger.info("Table successfully inserted into document")
     
     return doc
 

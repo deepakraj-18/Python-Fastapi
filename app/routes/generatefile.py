@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any
-import logging
 from datetime import datetime
 import io
 import sys
@@ -13,10 +12,6 @@ from services.sharepoint import SharePointUtils
 from services.documentprocessor import DocumentProcessor
 from services.imageservice import generate_chart_image
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Create router
 router = APIRouter()
 
 @router.post("/generatedocument", 
@@ -28,53 +23,40 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
     try:
         sharepoint = SharePointUtils()
         doc_processor = DocumentProcessor()
-        
-        logger.info(f"Processing document request - documentIsOld: {request.documentIsOld}")
-        
+
         if request.documentIsOld == 0:
-            if not request.templateId:
+            if not request.driveId:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="templateId is required for new documents"
+                    detail="driveId is required for new documents"
                 )
-            
-            logger.info(f"Fetching template: {request.templateId}")
-            document_stream = sharepoint.get_template_by_id(request.templateId)
-            file_name = sharepoint.generate_file_name("Report")
+
+            document_stream = sharepoint.get_document_by_name(request.documentName, is_old_document=False, drive_id=request.driveId)
+            file_name = os.path.basename(request.documentName)
             is_new_document = True
-            
+
         elif request.documentIsOld == 1:
-            if not request.documentId:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="documentId is required for existing documents"
-                )
-            
-            logger.info(f"Fetching existing document: {request.documentId}")
-            document_stream = sharepoint.download_file_by_id(request.documentId)
+            document_stream = sharepoint.get_document_by_name(request.documentName, is_old_document=True)
+            file_name = os.path.basename(request.documentName)
             is_new_document = False
-            
+
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="documentIsOld must be 0 (new) or 1 (existing)"
             )
-        
+
         chart_images: Dict[str, io.BytesIO] = {}
         
         if request.charts:
-            logger.info(f"Generating {len(request.charts)} charts")
             for chart in request.charts:
                 try:
-                    # Generate chart image based on chartType
                     if chart.chartType.lower() in ["table", "dynamic_table"]:
                         chart_image = generate_chart_image(chart.data, chart.title)
                         chart_images[chart.tag] = chart_image
-                        logger.info(f"Generated chart for tag: {chart.tag}")
                     else:
                         chart_image = generate_chart_image(chart.data, chart.title)
                         chart_images[chart.tag] = chart_image
-                        logger.info(f"Generated default table chart for tag: {chart.tag}")
                         
                 except Exception as e:
                     continue
@@ -120,15 +102,12 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
             )
         )
         
-        logger.info(f"Document processing completed successfully: {metadata['fileId']}")
         return response
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except HTTPException as http_exc:
         raise
-        
+
     except Exception as e:
-        logger.error(f"Document processing failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Document processing failed: {str(e)}"
@@ -139,7 +118,6 @@ async def health_check():
     """Simple health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-# Error handlers
 @router.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     return ErrorResponse(

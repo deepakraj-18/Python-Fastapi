@@ -11,13 +11,12 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Add CORS middleware to allow requests from all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8080", "http://127.0.0.1:8080"],  # Add your frontend URLs
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],  
+    allow_headers=["*"], 
 )
 
 @app.post("/api/generatedocument", 
@@ -46,14 +45,19 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                 file_name = request.documentName
                 current_version = 1
             else:
-                document_stream = sharepoint.get_document_by_name(request.documentName, is_old_document=False)
+                if not request.driveId:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="driveId is required for new documents"
+                    )
+                document_stream = sharepoint.get_document_by_name(request.documentName, is_old_document=False, drive_id=request.driveId)
                 file_name = sharepoint.generate_file_name("Report")
                 current_version = 0
         except Exception as e:
-            folder_type = "Output" if is_existing_document else "Templates"
+            location = "Output folder" if is_existing_document else "specified drive"
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Document '{request.documentName}' not found in {folder_type} folder: {str(e)}"
+                detail=f"Document '{request.documentName}' not found in {location}: {str(e)}"
             )
         
         table_data = None
@@ -71,7 +75,7 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
             processed_document = doc_processor.process_document(
                 document_stream,
                 request.placeholders,
-                None,  # chart_images
+                None, 
                 table_data
             )
         except Exception as processing_error:
@@ -170,6 +174,6 @@ async def root():
 def health():
     return {"status": "ok"}
 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

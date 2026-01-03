@@ -2,6 +2,7 @@ import msal
 import requests
 import io
 from typing import Dict, Any, Optional
+import os
 from datetime import datetime
 import sys
 import os
@@ -18,8 +19,8 @@ class SharePointUtils:
         self.output_path = settings.OUTPUT_PATH_ON_SP
         self.authority = f"https://login.microsoftonline.com/{self.tenant_id}"
         self.scopes = ["https://graph.microsoft.com/.default"]
-        self.site_url = "chandrudemo.sharepoint.com"
-        self.site_id = "chandrudemo.sharepoint.com,96b6d58e-0a8b-4027-ae03-84dafbdf2278,8409adc4-58cf-45d9-8ad3-a707503f2d0e"
+        self.site_url = settings.SITE_URL
+        self.site_id = settings.SITE_ID
 
     def get_access_token(self):
         app = msal.ConfidentialClientApplication(
@@ -54,6 +55,15 @@ class SharePointUtils:
         
         return io.BytesIO(response.content)
 
+    def download_file_by_path_with_drive(self, sharepoint_path: str, drive_id: str) -> io.BytesIO:
+        token = self.get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:{sharepoint_path}:/content"
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            return self._download_file_alternative_with_drive(sharepoint_path, token, drive_id)
+        return io.BytesIO(response.content)
+
     def _download_file_alternative(self, sharepoint_path: str, token: str) -> io.BytesIO:
         headers = {"Authorization": f"Bearer {token}"}
         encoded_path = sharepoint_path.replace('/', '%2F')
@@ -62,6 +72,16 @@ class SharePointUtils:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             raise Exception(f"Failed to download file from both methods. Status: {response.status_code}, Error: {response.text}")
+        
+        return io.BytesIO(response.content)
+
+    def _download_file_alternative_with_drive(self, sharepoint_path: str, token: str, drive_id: str) -> io.BytesIO:
+        headers = {"Authorization": f"Bearer {token}"}
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:{sharepoint_path}:/content"
+        
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"Failed to download file with custom drive. Status: {response.status_code}, Error: {response.text}")
         
         return io.BytesIO(response.content)
 
@@ -139,24 +159,28 @@ class SharePointUtils:
         return response.json()
 
     def generate_file_name(self, template_name: str = "Proposal") -> str:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        from datetime import datetime
+        import time
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
         return f"Generated_{template_name}_{timestamp}.docx"
 
-    def get_document_by_name(self, document_name: str, is_old_document: bool) -> io.BytesIO:
-        folder_type = "Output" if is_old_document else "Templates"
-        folder_path = self.output_path if is_old_document else self.template_path
-        file_path = f"{folder_path}/{document_name}"
-        
+    def get_document_by_name(self, document_name: str, is_old_document: bool, drive_id: Optional[str] = None) -> io.BytesIO:
+        if is_old_document:
+            current_drive_id = self.drive_id
+            file_path = f"{self.output_path}/{document_name}"
+            folder_type = "Output"
+        else:
+            current_drive_id = drive_id
+            file_path = document_name
+            folder_type = "Custom Drive"
+            if not current_drive_id:
+                raise ValueError(f"drive_id is required for new documents but was None for '{document_name}'. Please provide a valid driveId in the request payload.")
+
         try:
-            document = self.download_file_by_path(file_path)
+            document = self.download_file_by_path_with_drive(file_path, current_drive_id)
             return document
         except Exception as error:
-            try:
-                folder_contents = self.list_folder_contents(folder_path)
-            except Exception as list_error:
-                pass
-            
-            raise Exception(f"Document '{document_name}' not found in {folder_type} folder. Please verify the filename is correct.")
+            raise Exception(f"Document '{document_name}' not found in {folder_type}: {error}")
 
     def find_document_in_output(self, document_id: str) -> io.BytesIO:
         try:
