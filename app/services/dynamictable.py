@@ -364,84 +364,72 @@ def _generate_custom_table(doc, headers, rows, color_map, header_color, legend):
 
 def _create_single_table(doc, table_headers, rows, color_map, header_color, 
                         month_chunk, has_total_in_this_table, is_split_table, row_offset=0):
-    
     table = doc.add_table(rows=0, cols=len(table_headers))
     table.style = "Table Grid"
-    
     set_table_width_and_alignment(table)
-    
+
     header_row = table.add_row()
     header_cells = header_row.cells
-    
+
     for idx, header_text in enumerate(table_headers):
         cell = header_cells[idx]
         cell.text = str(header_text)
-        
         set_cell_shading(cell, header_color)
         set_cell_text_bold(cell)
         set_cell_font(cell, HEADER_FONT_SIZE, True)
         set_cell_vertical_alignment(cell, 'center')
-        
+
         if idx == 0:  
             align_cell(cell, 'center')
         elif idx == 1:  
             align_cell(cell, 'left')
         else:  
             align_cell(cell, 'center')
-    
+
     for row_idx, row_data in enumerate(rows):
         data_row = table.add_row()
         data_cells = data_row.cells
-        
+
         month_map = {}
         for month_obj in row_data.get('months', []):
             for month_name, month_info in month_obj.items():
                 month_map[month_name] = month_info
-        
-        # Fill in data for each column
+
         for col_idx, header in enumerate(table_headers):
             cell = data_cells[col_idx]
-            
-            if header in ['S.No', 'Staff', 'Total']:
-                # Static columns
-                if header == 'S.No':
-                    # Use proper sequential numbering
-                    cell_value = str(row_idx + 1)
-                else:
-                    cell_value = row_data.get(header, '')
-                cell.text = str(cell_value)
-                
-                # Special formatting for different columns
-                if header == 'S.No':
-                    set_cell_font(cell, DEFAULT_FONT_SIZE, False)
-                    align_cell(cell, 'center')
-                    set_cell_vertical_alignment(cell, 'center')
-                elif header == 'Staff':
-                    set_cell_font(cell, STAFF_FONT_SIZE, False)
-                    align_cell(cell, 'left')
-                    set_cell_vertical_alignment(cell, 'top')
-                elif header == 'Total':
-                    set_cell_font(cell, DEFAULT_FONT_SIZE, True)
-                    align_cell(cell, 'center')
-                    set_cell_vertical_alignment(cell, 'top')
-            
+
+            if col_idx == 0:
+                cell_value = str(row_idx + 1)
+            elif header == 'Staff':
+                cell_value = row_data.get(header, '')
+            elif header == 'Total':
+                cell_value = row_data.get(header, '')
             else:
-                # Month columns
                 month_info = month_map.get(header, {})
                 cell_value = month_info.get('value', '')
-                cell.text = str(cell_value)
-                
-                # Apply phase-based coloring
+
+            cell.text = str(cell_value)
+
+            if col_idx == 0:
+                set_cell_font(cell, DEFAULT_FONT_SIZE, False)
+                align_cell(cell, 'center')
+                set_cell_vertical_alignment(cell, 'center')
+            elif header == 'Staff':
+                set_cell_font(cell, STAFF_FONT_SIZE, False)
+                align_cell(cell, 'left')
+                set_cell_vertical_alignment(cell, 'top')
+            elif header == 'Total':
+                set_cell_font(cell, DEFAULT_FONT_SIZE, True)
+                align_cell(cell, 'center')
+                set_cell_vertical_alignment(cell, 'top')
+            else:
                 phase = month_info.get('phase')
                 if phase and phase in color_map:
                     set_cell_shading(cell, color_map[phase])
-                
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
                 set_cell_vertical_alignment(cell, 'top')
-    
-    # ---- ADD TOTALS ROW ----
-    # Preprocess month maps for all rows
+
     month_maps = []
     for row_data in rows:
         month_map = {}
@@ -450,7 +438,6 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
                 month_map[month_name] = month_info
         month_maps.append(month_map)
 
-    # Function to calculate column total
     def calculate_column_total(header):
         column_total = 0.0
         for month_map in month_maps:
@@ -466,7 +453,6 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
                 pass
         return column_total
 
-    # Function to calculate grand total
     def calculate_grand_total():
         grand_total = 0.0
         for row_data in rows:
@@ -481,7 +467,6 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
                 pass
         return grand_total
 
-    # Use ThreadPoolExecutor for parallel computation
     with ThreadPoolExecutor() as executor:
         column_totals = list(executor.map(calculate_column_total, table_headers[2:]))
         grand_total = calculate_grand_total()
@@ -493,36 +478,29 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
         cell = totals_cells[col_idx]
 
         if col_idx == 0: 
-            # Continue sequential numbering after all data rows
             cell.text = str(len(rows) + 1)
             set_cell_font(cell, DEFAULT_FONT_SIZE, False)
             align_cell(cell, 'center')
             set_cell_vertical_alignment(cell, 'center')
-
-        elif col_idx == 1:  # Staff column
+        elif col_idx == 1:  
             cell.text = "Total"
             set_cell_font(cell, STAFF_FONT_SIZE, True)
             align_cell(cell, 'left')
             set_cell_vertical_alignment(cell, 'center')
-
         elif header == 'Total':
-            # Format number: show as int if it's a whole number, otherwise show as float
             cell.text = str(int(grand_total)) if grand_total == int(grand_total) else str(round(grand_total, 2))
             set_cell_font(cell, DEFAULT_FONT_SIZE, True)
             align_cell(cell, 'center')
             set_cell_vertical_alignment(cell, 'center')
-
         else:
-            column_total = column_totals[col_idx - 2]  # Adjust index for month columns
-            # Format number: show as int if it's a whole number, otherwise show as float
+            column_total = column_totals[col_idx - 2]
             cell.text = str(int(column_total)) if column_total == int(column_total) else str(round(column_total, 2))
             set_cell_font(cell, DEFAULT_FONT_SIZE, True)
             align_cell(cell, 'center')
             set_cell_vertical_alignment(cell, 'center')
-        
 
     num_static_cols = 2  
     num_month_cols = len(month_chunk)
     enforce_column_widths(table, num_static_cols, num_month_cols, has_total_in_this_table)
-    
+
     return table
