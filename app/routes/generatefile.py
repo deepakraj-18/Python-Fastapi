@@ -72,11 +72,19 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                 "headerColor": request.data.headerColor
             }
         
+        project_brief_data = None
+        if request.projectBrief:
+            project_brief_data = {
+                "tag": request.projectBrief.tag,
+                "items": request.projectBrief.items
+            }
+        
         processed_document = doc_processor.process_document(
             document_stream, 
             request.placeholders, 
             chart_images,
-            table_data
+            table_data,
+            project_brief_data
         )
         if is_new_document:
             upload_response = sharepoint.upload_new_file(processed_document, file_name)

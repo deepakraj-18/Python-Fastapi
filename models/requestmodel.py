@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Union
 
+class ProjectBriefData(BaseModel):
+    tag: str = Field(default="ProjectBrief", description="Tag name of content control where project brief table should be inserted (default: 'ProjectBrief')")
+    items: List[Dict[str, str]] = Field(..., description="Array of project brief items with 'label' and 'value' keys")
+    
 class DynamicTableData(BaseModel):
     tag: str = Field(default="table", description="Tag name of content control where table should be inserted (default: 'table')")
     headers: Optional[List[str]] = Field(None, description="Table headers (optional)")
@@ -20,11 +24,21 @@ class GenerateDocumentRequest(BaseModel):
     driveId: Optional[str] = Field(None, description="Drive ID for new documents (required when documentIsOld=0)")
     placeholders: Dict[str, Union[str, int, float]] = Field(..., description="Key-value pairs for text replacement")
     data: Optional[DynamicTableData] = Field(None, description="Dynamic table data to generate and insert into document")
+    projectBrief: Optional[ProjectBriefData] = Field(None, description="Project brief table data to generate and insert into document")
     meta: Optional[RequestMetadata] = Field(None, description="Request metadata")
     
     class Config:
         json_schema_extra = {
             "example": {
+                "projectBrief": {
+                    "tag": "ProjectBrief",
+                    "items": [
+                        {"label": "Total BUA in Sqm", "value": "2,000"},
+                        {"label": "Duration in Months", "value": "12"},
+                        {"label": "Built Environment", "value": "Commercial Office Space"},
+                        {"label": "No. of floors", "value": "1B+G+1.5 Floors"}
+                    ]
+                },
                 "data": {
                     "tag": "Table",
                     "headerColor": "#333399",
@@ -136,7 +150,6 @@ class GenerateDocumentRequest(BaseModel):
                     "ProposalCode": "VC-CPMC-026",
                     "Reference": "Discussion held on 05 January 2026",
                     "CreatedDate": "08 January 2026",
-                    "Subject": "CONSTRUCTION PROJECT MANAGEMENT CONSULTANCY SERVICES",
                     "StaffDeployment": "Quantity Surveyor",
                     "Regards": "SURESH K R,"
                 }

@@ -54,6 +54,41 @@ def set_cell_vertical_alignment(cell, valign='center'):
     vAlign.set(qn('w:val'), valign)
     tcPr.append(vAlign)
 
+def set_cell_margins(cell, top=0, bottom=0, left=0, right=0):
+    """Set cell margins in points"""
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    
+    # Create table cell margins element
+    tcMar = OxmlElement('w:tcMar')
+    
+    if top > 0:
+        top_mar = OxmlElement('w:top')
+        top_mar.set(qn('w:w'), str(int(top * 20)))  # Convert points to twentieths of a point
+        top_mar.set(qn('w:type'), 'dxa')
+        tcMar.append(top_mar)
+    
+    if bottom > 0:
+        bottom_mar = OxmlElement('w:bottom')
+        bottom_mar.set(qn('w:w'), str(int(bottom * 20)))  # Convert points to twentieths of a point
+        bottom_mar.set(qn('w:type'), 'dxa')
+        tcMar.append(bottom_mar)
+    
+    if left > 0:
+        left_mar = OxmlElement('w:left')
+        left_mar.set(qn('w:w'), str(int(left * 20)))  # Convert points to twentieths of a point
+        left_mar.set(qn('w:type'), 'dxa')
+        tcMar.append(left_mar)
+    
+    if right > 0:
+        right_mar = OxmlElement('w:right')
+        right_mar.set(qn('w:w'), str(int(right * 20)))  # Convert points to twentieths of a point
+        right_mar.set(qn('w:type'), 'dxa')
+        tcMar.append(right_mar)
+    
+    if tcMar.getchildren():  # Only append if there are margin elements
+        tcPr.append(tcMar)
+
 def set_cell_width(cell, width_cm):
     tcPr = cell._tc.get_or_add_tcPr()
     tcW = OxmlElement('w:tcW')
@@ -504,3 +539,121 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
     enforce_column_widths(table, num_static_cols, num_month_cols, has_total_in_this_table)
 
     return table
+
+
+def find_all_sdt_by_title(doc: Document, title: str):
+    """Find all SDTs with the given title/tag"""
+    sdts = []
+    for el in doc.element.body.iter():
+        if el.tag.endswith("sdt"):
+            for child in el.iter():
+                if child.tag.endswith("alias") and child.get(qn("w:val")) == title:
+                    sdts.append(el)
+                    break
+                if child.tag.endswith("tag") and child.get(qn("w:val")) == title:
+                    sdts.append(el)
+                    break
+    return sdts
+
+def set_table_dotted_border(table):
+    """Set dotted borders for the table"""
+    tbl = table._tbl
+    tblPr = tbl.tblPr
+    
+    # Set table borders
+    tblBorders = OxmlElement('w:tblBorders')
+    
+    # Define dotted border properties
+    border_props = {
+        'w:val': 'dotted',
+        'w:sz': '6',  # Border size
+        'w:space': '0',
+        'w:color': '000000'  # Black color
+    }
+    
+    # Apply to all borders
+    for border_name in ['w:top', 'w:left', 'w:bottom', 'w:right', 'w:insideH', 'w:insideV']:
+        border = OxmlElement(border_name)
+        for prop, value in border_props.items():
+            border.set(qn(prop), value)
+        tblBorders.append(border)
+    
+    tblPr.append(tblBorders)
+
+def set_project_brief_table_width(table):
+    tbl = table._tbl
+    tblPr = tbl.tblPr
+    
+    tblW = OxmlElement('w:tblW')
+    tblW.set(qn('w:w'), '4000') 
+    tblW.set(qn('w:type'), 'pct')
+    tblPr.append(tblW)
+    
+    tblJc = OxmlElement('w:jc')
+    tblJc.set(qn('w:val'), 'left')
+    tblPr.append(tblJc)
+
+def set_project_brief_column_widths(table):
+    label_width = Cm(5.0) 
+    value_width = Cm(5.0) 
+    
+    try:
+        if len(table.columns) >= 2:
+            table.columns[0].width = label_width
+            table.columns[1].width = value_width
+    except:
+        pass
+    
+    for row in table.rows:
+        if len(row.cells) >= 2:
+            set_cell_width(row.cells[0], label_width)
+            set_cell_width(row.cells[1], value_width)
+
+def generate_project_brief_table(doc: Document, tag: str, data: Dict[str, Any]) -> Document:
+
+    items = data.get("items", [])
+    
+    if not items:
+        return doc
+
+    sdts = find_all_sdt_by_title(doc, tag)
+    
+    if not sdts:
+        return doc
+    
+    for sdt in sdts:
+        sdt_content = next((el for el in sdt.iter() if el.tag.endswith("sdtContent")), None)
+        if sdt_content is None:
+            continue
+        
+        for child in list(sdt_content):
+            sdt_content.remove(child)
+
+        table = doc.add_table(rows=0, cols=2)
+        table.style = 'Table Grid'
+        
+        for item in items:
+            label = item.get("label", "")
+            value = item.get("value", "")
+            
+            label_text = f"• {label}"
+            
+            row = table.add_row()
+            cells = row.cells
+            cells[0].text = label_text
+            cells[1].text = str(value)
+            
+            align_cell(cells[0], 'left')
+            align_cell(cells[1], 'left')
+            set_cell_font(cells[0], STAFF_FONT_SIZE, name="Century Gothic")
+            set_cell_font(cells[1], STAFF_FONT_SIZE, name="Century Gothic")
+            set_cell_margins(cells[0], bottom=5)
+            set_cell_margins(cells[1], bottom=5)
+
+        set_project_brief_table_width(table)
+        set_project_brief_column_widths(table)
+        set_table_dotted_border(table)
+        
+        sdt_content.append(table._tbl)
+    
+    return doc

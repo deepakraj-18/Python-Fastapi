@@ -74,12 +74,18 @@ class DocumentProcessor:
     
     def process_document(self, document_stream: io.BytesIO, placeholders: Dict[str, Union[str, int, float]], 
                         chart_images: Optional[Dict[str, io.BytesIO]] = None,
-                        table_data: Optional[Dict[str, Any]] = None) -> io.BytesIO:
+                        table_data: Optional[Dict[str, Any]] = None,
+                        project_brief_data: Optional[Dict[str, Any]] = None) -> io.BytesIO:
         doc = self.load_document(document_stream)
         doc = self.replace_tags(doc, placeholders)
         
         if table_data:
             tag = table_data.get("tag", "table")
             doc = generate_dynamic_table(doc, tag, table_data)
+        
+        if project_brief_data:
+            from .dynamictable import generate_project_brief_table
+            tag = project_brief_data.get("tag", "ProjectBrief")
+            doc = generate_project_brief_table(doc, tag, project_brief_data)
         
         return self.save_document(doc)
