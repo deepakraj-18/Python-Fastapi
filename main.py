@@ -72,12 +72,20 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                 "headerColor": getattr(request.data, "headerColor", "#333399")
             }
         
+        project_brief_data = None
+        if request.projectBrief:
+            project_brief_data = {
+                "tag": getattr(request.projectBrief, "tag", "ProjectBrief"),
+                "items": request.projectBrief.items
+            }
+        
         try:
             processed_document = doc_processor.process_document(
                 document_stream,
                 request.placeholders,
                 None, 
-                table_data
+                table_data,
+                project_brief_data
             )
         except Exception as processing_error:
             raise HTTPException(
