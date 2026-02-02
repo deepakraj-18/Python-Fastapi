@@ -1,4 +1,7 @@
 from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from models.requestmodel import GenerateDocumentRequest
@@ -19,12 +22,36 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
+JWT_ISSUER = "https://localhost:7153/"
+JWT_AUDIENCE = "https://localhost:7153/"
+JWT_SECRET = "M2vAjdN7XqK8cFpZ9sYTwuRZB3HLqVnJxG0btDm4EyUV1WCkhrfTa5g6MzQeLSnP&&"
+JWT_ALGORITHM = "HS256"
+JWT_EXP_MINUTES = 10
+
+security = HTTPBearer()
+
+def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            audience=JWT_AUDIENCE,
+            issuer=JWT_ISSUER,
+            options={"require": ["exp", "iss", "aud"]}
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 @app.post("/api/generatedocument", 
          response_model=GenerateDocumentResponse,
          summary="Generate or update Word document",
          description="Generate a new document from template or update existing document with placeholders and dynamic tables")
-async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumentResponse:
+async def generate_document(request: GenerateDocumentRequest, token_payload: dict = Depends(verify_jwt)) -> GenerateDocumentResponse:
     try:
         from app.services.sharepoint import SharePointUtils
         from app.services.documentprocessor import DocumentProcessor
