@@ -40,118 +40,334 @@ class GenerateDocumentRequest(BaseModel):
                     ]
                 },
                 "data": {
-                    "tag": "Table",
+                    "colors": [
+                    {
+                        "Planning Phase": "#FFC000"
+                    },
+                    {
+                        "Construction Phase": "#00B050"
+                    },
+                    {
+                        "Closeout Phase": "#4472C4"
+                    }
+                    ],
                     "headerColor": "#333399",
                     "headers": [
-                        "Sl. No.",
-                        "Staff",
-                        "Dec-25",
-                        "Jan-26",
-                        "Feb-26",
-                        "Mar-26",
-                        "Apr-26",
-                        "May-26",
-                        "Jun-26",
-                        "Jul-26",
-                        "Aug-26",
-                        "Sep-26",
-                        "Oct-26",
-                        "Nov-26",
-                        "Total"
-                    ],
-                    "colors": [
-                        {"Planning Phase": "#FFC000"},
-                        {"Construction Phase": "#00B050"},
-                        {"Closeout Phase": "#4472C4"}
+                    "Sl. No.",
+                    "Staff",
+                    "Dec-25",
+                    "Jan-26",
+                    "Feb-26",
+                    "Mar-26",
+                    "Apr-26",
+                    "May-26",
+                    "Jun-26",
+                    "Jul-26",
+                    "Aug-26",
+                    "Sep-26",
+                    "Oct-26",
+                    "Nov-26",
+                    "Total"
                     ],
                     "legend": [
-                        {"phase": "Planning Phase", "color": "#FFC000"},
-                        {"phase": "Construction Phase", "color": "#00B050"},
-                        {"phase": "Closeout Phase", "color": "#4472C4"}
+                    {
+                        "color": "#FFC000",
+                        "phase": "Planning Phase"
+                    },
+                    {
+                        "color": "#00B050",
+                        "phase": "Construction Phase"
+                    },
+                    {
+                        "color": "#4472C4",
+                        "phase": "Closeout Phase"
+                    }
                     ],
                     "rows": [
+                    {
+                        "Sl. No.": "1",
+                        "Staff": "Project Engineer",
+                        "Total": "12",
+                        "months": [
                         {
-                            "Sl. No.": "1",
-                            "Staff": "Project Engineer",
-                            "Total": "12",
-                            "months": [
-                                {"Dec-25": {"phase": "Planning Phase", "value": "1"}},
-                                {"Jan-26": {"phase": "Planning Phase", "value": "1"}},
-                                {"Feb-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Mar-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Apr-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"May-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Jun-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Jul-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Aug-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Sep-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Oct-26": {"phase": "Closeout Phase", "value": "1"}},
-                                {"Nov-26": {"phase": "Closeout Phase", "value": "1"}}
-                            ]
+                            "Dec-25": {
+                            "phase": "Planning Phase",
+                            "value": "1"
+                            }
                         },
                         {
-                            "Sl. No.": "2",
-                            "Staff": "Site Supervisor",
-                            "Total": "20",
-                            "months": [
-                                {"Dec-25": {"phase": "Planning Phase", "value": "0"}},
-                                {"Jan-26": {"phase": "Planning Phase", "value": "0"}},
-                                {"Feb-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"Mar-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"Apr-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"May-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"Jun-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"Jul-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"Aug-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"Sep-26": {"phase": "Construction Phase", "value": "2"}},
-                                {"Oct-26": {"phase": "Closeout Phase", "value": "2"}},
-                                {"Nov-26": {"phase": "Closeout Phase", "value": "2"}}
-                            ]
+                            "Jan-26": {
+                            "phase": "Planning Phase",
+                            "value": "1"
+                            }
                         },
                         {
-                            "Sl. No.": "3",
-                            "Staff": "Quantity Surveyor",
-                            "Total": "10",
-                            "months": [
-                                {"Dec-25": {"phase": "Planning Phase", "value": "1"}},
-                                {"Jan-26": {"phase": "Planning Phase", "value": "1"}},
-                                {"Feb-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Mar-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Apr-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"May-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Jun-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Jul-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Aug-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Sep-26": {"phase": "Construction Phase", "value": "1"}},
-                                {"Oct-26": {"phase": "Closeout Phase", "value": "0"}},
-                                {"Nov-26": {"phase": "Closeout Phase", "value": "0"}}
-                            ]
+                            "Feb-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Mar-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Apr-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "May-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Jun-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Jul-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Aug-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Sep-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Oct-26": {
+                            "phase": "Closeout Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Nov-26": {
+                            "phase": "Closeout Phase",
+                            "value": "1"
+                            }
                         }
-                    ]
+                        ]
+                    },
+                    {
+                        "Sl. No.": "2",
+                        "Staff": "Site Supervisor",
+                        "Total": "20",
+                        "months": [
+                        {
+                            "Dec-25": {
+                            "phase": "Planning Phase",
+                            "value": "0"
+                            }
+                        },
+                        {
+                            "Jan-26": {
+                            "phase": "Planning Phase",
+                            "value": "0"
+                            }
+                        },
+                        {
+                            "Feb-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Mar-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Apr-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "May-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Jun-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Jul-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Aug-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Sep-26": {
+                            "phase": "Construction Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Oct-26": {
+                            "phase": "Closeout Phase",
+                            "value": "2"
+                            }
+                        },
+                        {
+                            "Nov-26": {
+                            "phase": "Closeout Phase",
+                            "value": "2"
+                            }
+                        }
+                        ]
+                    },
+                    {
+                        "Sl. No.": "3",
+                        "Staff": "Quantity Surveyor",
+                        "Total": "10",
+                        "months": [
+                        {
+                            "Dec-25": {
+                            "phase": "Planning Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Jan-26": {
+                            "phase": "Planning Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Feb-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Mar-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Apr-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "May-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Jun-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Jul-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Aug-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Sep-26": {
+                            "phase": "Construction Phase",
+                            "value": "1"
+                            }
+                        },
+                        {
+                            "Oct-26": {
+                            "phase": "Closeout Phase",
+                            "value": "0"
+                            }
+                        },
+                        {
+                            "Nov-26": {
+                            "phase": "Closeout Phase",
+                            "value": "0"
+                            }
+                        }
+                        ]
+                    }
+                    ],
+                    "tag": "Table"
                 },
                 "documentIsOld": 0,
-                "driveId": "b!jtW2losKJ0CuA4Ta-98ieMStCYTPWNlFitOnB1A_LQ7uK4_iny_SQI5e_PT_VePY",
-                "documentName": "/BD-DENEC-562-2025-2026-R0.docx",
+                "documentName": "/Templates/ANP_PSL_CPMC_R1.docx",
+                "driveId": "b!LLTsCOpdiE2htadxu50J82rygom69uVDiFijc__3FBg5Ec6om2DWR6vKVIYE4jsw",
                 "placeholders": {
-                    "CompanyName": "Vertex Constructions LLP",
-                    "CompanyAddress": "Mr. Arjun Mehta,\n45 Tech Park Road,\nHyderabad, Telangana",
-                    "ProjectName": "Skyline Business Hub",
-                    "ProjectLocation": "Office Park",
                     "BuiltEnvironment": "Mixed-use Commercial Development",
-                    "NumberofFloors": "2B + G + 5 Floors",
-                    "TotalBUAinSqm": "3,750",
-                    "DurationinMonths": "18",
-                    "PlanningPhase": "2",
-                    "ConstructionPhase": "12",
-                    "CloseoutPhase": "4",
-                    "ProjectDuration": "12",
                     "CPMCServices": "Project Planning, Cost Control, Contract Administration, Quality Assurance & Safety Management",
+                    "CloseoutPhase": "4",
+                    "CompanyAddress": "Mr. Arjun Mehta,\n45 Tech Park Road,\nHyderabad, Telangana",
+                    "CompanyName": "Vertex Constructions LLP",
+                    "ConstructionPhase": "12",
+                    "CreatedDate": "08 January 2026",
+                    "DurationinMonths": "18",
+                    "NumberofFloors": "2B + G + 5 Floors",
+                    "PlanningPhase": "2",
                     "ProfessionalFee": "Rs. 22.50 Lakhs (Rupees Twenty Two Lakhs and Fifty Thousand only)",
+                    "ProjectDuration": "12",
+                    "ProjectLocation": "Office Park",
+                    "ProjectName": "Skyline Business Hub",
                     "ProposalCode": "VC-CPMC-026",
                     "Reference": "Discussion held on 05 January 2026",
-                    "CreatedDate": "08 January 2026",
+                    "Regards": "SURESH K R,",
                     "StaffDeployment": "Quantity Surveyor",
-                    "Regards": "SURESH K R,"
+                    "TotalBUAinSqm": "3,750"
+                },
+                "projectBrief": {
+                    "items": [
+                    {
+                        "label": "Total BUA in Sqm",
+                        "value": "2,000"
+                    },
+                    {
+                        "label": "Duration in Months",
+                        "value": "12"
+                    },
+                    {
+                        "label": "Built Environment",
+                        "value": "Commercial Office Space"
+                    },
+                    {
+                        "label": "No. of floors",
+                        "value": "1B+G+1.5 Floors"
+                    }
+                    ],
+                    "tag": "ProjectBrief"
                 }
             }
         }

@@ -363,8 +363,14 @@ def _generate_simple_table(doc, rows, color_map, header_color):
 
 
 def _generate_custom_table(doc, headers, rows, color_map, header_color, legend):
-    month_headers = [list(m.keys())[0] for m in rows[0].get('months', [])]
-    static_headers = [h for h in headers if h not in month_headers]
+    all_months_set = set()
+    for row in rows:
+        for month_obj in row.get('months', []):
+            all_months_set.update(month_obj.keys())
+    
+    # Use headers order to maintain chronological order
+    month_headers = [h for h in headers if h in all_months_set]
+    static_headers = [h for h in headers if h not in all_months_set]
     has_total = 'Total' in static_headers
     tables = []
     
