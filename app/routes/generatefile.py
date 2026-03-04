@@ -61,6 +61,7 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                 except Exception as e:
                     continue
 
+        # Handle legacy single table data
         table_data = None
         if request.data:
             table_data = {
@@ -71,6 +72,25 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                 "legend": request.data.legend,
                 "headerColor": request.data.headerColor
             }
+        
+        deployment_tables = None
+        if request.deploymentTables:
+            deployment_tables = []
+            for idx, table_item in enumerate(request.deploymentTables):
+                try:
+                    tbl = {
+                        "tag": table_item.data.tag,
+                        "headers": table_item.data.headers,
+                        "rows": table_item.data.rows,
+                        "colors": table_item.data.colors,
+                        "legend": table_item.data.legend,
+                        "headerColor": table_item.data.headerColor,
+                        "isDeployment": True
+                    }
+                    deployment_tables.append(tbl)
+                except Exception as ex:
+                    print(f"[Route] failed to convert table_item {idx}: {ex}")
+        
         
         project_brief_data = None
         if request.projectBrief:
@@ -84,7 +104,8 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
             request.placeholders, 
             chart_images,
             table_data,
-            project_brief_data
+            project_brief_data,
+            deployment_tables
         )
         if is_new_document:
             upload_response = sharepoint.upload_new_file(processed_document, file_name)

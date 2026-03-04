@@ -59,7 +59,6 @@ def set_cell_margins(cell, top=0, bottom=0, left=0, right=0):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
     
-    # Create table cell margins element
     tcMar = OxmlElement('w:tcMar')
     
     if top > 0:
@@ -179,8 +178,6 @@ def _generate_legend_table(doc, legend, color_map):
     
     return legend_table
 
-# ================= SDT =================
-
 def find_sdt_by_title(doc: Document, title: str):
     for el in doc.element.body.iter():
         if el.tag.endswith("sdt"):
@@ -214,16 +211,28 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
     rows = data.get("rows", [])
     colors = data.get("colors", [])
     legend = data.get("legend", [])
-    header_color = data.get("headerColor", "#333399")
+    is_deployment = data.get("isDeployment", False)
+    if "headerColor" in data and data.get("headerColor") is not None:
+        header_color = data.get("headerColor")
+    else:
+        header_color = "#FFFFFF" if is_deployment else "#333399"
 
     if not rows:
         return doc
 
+    print(f"[DynamicTable] tag={tag}, is_deployment={is_deployment}, header_color={header_color}")
     color_map = parse_color_mapping(colors)
     table_format = detect_table_format(rows, headers, colors)
 
     sdt = find_sdt_by_title(doc, tag)
     if sdt is None:
+        for el in doc.element.body.iter():
+            if el.tag.endswith("sdt"):
+                for child in el.iter():
+                    if child.tag.endswith("tag"):
+                        existing_tag = child.get(qn("w:val"))
+                    elif child.tag.endswith("alias"):
+                        existing_alias = child.get(qn("w:val"))
         return doc
 
     sdt_content = next(el for el in sdt.iter() if el.tag.endswith("sdtContent"))
@@ -236,7 +245,8 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
         sdt_content.append(table._tbl)
 
     elif table_format == 'custom':
-        tables = _generate_custom_table(doc, headers, rows, color_map, header_color, legend)
+        max_cols = 8 if is_deployment else MAX_DYNAMIC_COLS
+        tables = _generate_custom_table(doc, headers, rows, color_map, header_color, legend, max_cols)
         
         for i, table in enumerate(tables):
             if i > 0: 
@@ -287,7 +297,6 @@ def _generate_phase_based_table(doc, rows, color_map, header_color):
         else:
             align_cell(cell, 'center')  
     
-    # Add data rows
     for r in rows:
         data_row = table.add_row()
         data_cells = data_row.cells
@@ -362,7 +371,9 @@ def _generate_simple_table(doc, rows, color_map, header_color):
     return table
 
 
-def _generate_custom_table(doc, headers, rows, color_map, header_color, legend):
+def _generate_custom_table(doc, headers, rows, color_map, header_color, legend, max_dynamic_cols=MAX_DYNAMIC_COLS):
+    # debug output to help understand pagination behavior
+    print(f"[DynamicTable] _generate_custom_table called with max_dynamic_cols={max_dynamic_cols}")
     all_months_set = set()
     for row in rows:
         for month_obj in row.get('months', []):
@@ -374,13 +385,14 @@ def _generate_custom_table(doc, headers, rows, color_map, header_color, legend):
     has_total = 'Total' in static_headers
     tables = []
     
-    if len(month_headers) > MAX_DYNAMIC_COLS:
-        for chunk_idx in range(0, len(month_headers), MAX_DYNAMIC_COLS):
-            chunk = month_headers[chunk_idx:chunk_idx + MAX_DYNAMIC_COLS]
+    if len(month_headers) > max_dynamic_cols:
+        for chunk_idx in range(0, len(month_headers), max_dynamic_cols):
+            chunk = month_headers[chunk_idx:chunk_idx + max_dynamic_cols]
+            print(f"[DynamicTable] chunk {chunk_idx // max_dynamic_cols}: {chunk}")
             remaining_months_after_this_chunk = len(month_headers) - (chunk_idx + len(chunk))
             is_last_chunk = remaining_months_after_this_chunk == 0
             
-            if has_total and is_last_chunk and len(chunk) < MAX_DYNAMIC_COLS:
+            if has_total and is_last_chunk and len(chunk) < max_dynamic_cols:
                 table_headers = static_headers[:2] + chunk + ['Total']
                 table = _create_single_table(doc, table_headers, rows, color_map, header_color, 
                                            chunk, True, chunk_idx > 0)
@@ -391,7 +403,7 @@ def _generate_custom_table(doc, headers, rows, color_map, header_color, legend):
             
             tables.append(table)
         
-        if has_total and len(month_headers) % MAX_DYNAMIC_COLS == 0:
+        if has_total and len(month_headers) % max_dynamic_cols == 0:
             total_table_headers = static_headers[:2] + ['Total']
             total_table = _create_single_table(doc, total_table_headers, rows, color_map, header_color, 
                                              [], True, True)
@@ -441,7 +453,7 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
 
             if col_idx == 0:
                 cell_value = str(row_idx + 1)
-            elif header == 'Staff':
+            elif col_idx == 1:
                 cell_value = row_data.get(header, '')
             elif header == 'Total':
                 cell_value = row_data.get(header, '')
@@ -455,7 +467,7 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
                 set_cell_vertical_alignment(cell, 'center')
-            elif header == 'Staff':
+            elif col_idx == 1:
                 set_cell_font(cell, STAFF_FONT_SIZE, False)
                 align_cell(cell, 'left')
                 set_cell_vertical_alignment(cell, 'top')

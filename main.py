@@ -89,30 +89,51 @@ async def generate_document(request: GenerateDocumentRequest, token_payload: dic
             )
         
         table_data = None
-        if request.data:
+        deployment_tables = None
+        if hasattr(request, "deploymentTables") and request.deploymentTables:
+            print(f"[MainRoute] incoming deploymentTables: {request.deploymentTables}")
+            deployment_tables = []
+            for idx, table_item in enumerate(request.deploymentTables):
+                print(f"[MainRoute] processing table_item {idx}: {table_item!r}")
+                try:
+                    data_obj = table_item.data if hasattr(table_item, "data") else table_item.get("data")
+                except Exception:
+                    data_obj = None
+                if data_obj:
+                    if hasattr(data_obj, "dict"):
+                        data_dict = data_obj.dict()
+                    elif isinstance(data_obj, dict):
+                        data_dict = data_obj
+                    else:
+                        data_dict = {}
+                    # mark origin for column threshold
+                    data_dict["isDeployment"] = True
+                    deployment_tables.append(data_dict)
+        elif request.data:
             table_data = {
                 "tag": getattr(request.data, "tag", "table"),
                 "headers": getattr(request.data, "headers", None),
                 "rows": request.data.rows,
                 "colors": getattr(request.data, "colors", None),
                 "legend": getattr(request.data, "legend", None),
-                "headerColor": getattr(request.data, "headerColor", "#333399")
+                "headerColor": request.data.headerColor
             }
-        
+
         project_brief_data = None
         if request.projectBrief:
             project_brief_data = {
                 "tag": getattr(request.projectBrief, "tag", "ProjectBrief"),
                 "items": request.projectBrief.items
             }
-        
+
         try:
             processed_document = doc_processor.process_document(
                 document_stream,
                 request.placeholders,
-                None, 
+                None,
                 table_data,
-                project_brief_data
+                project_brief_data,
+                deployment_tables
             )
         except Exception as processing_error:
             raise HTTPException(
@@ -156,7 +177,7 @@ async def generate_document(request: GenerateDocumentRequest, token_payload: dic
         metadata["version"] = new_version
         
         placeholders_count = len(request.placeholders) if request.placeholders else 0
-        has_table = request.data is not None
+        has_table = (request.data is not None) or (hasattr(request, "deploymentTables") and bool(request.deploymentTables))
         
         if is_existing_document:
             success_message = f"Document updated successfully (version {current_version} → {new_version})"

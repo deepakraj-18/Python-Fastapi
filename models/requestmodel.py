@@ -11,19 +11,23 @@ class DynamicTableData(BaseModel):
     rows: List[Dict[str, Any]] = Field(..., description="Array of row data objects for table generation")
     colors: Optional[List[Dict[str, str]]] = Field(None, description="Array of color mappings for phases/categories")
     legend: Optional[List[Dict[str, str]]] = Field(None, description="Array of legend items with phase and color")
-    headerColor: Optional[str] = Field("#333399", description="Header row color (default: #333399)")
+    headerColor: Optional[str] = Field(None, description="Header row color (default: #333399 for regular or white for deployment tables)")
     
 class RequestMetadata(BaseModel):
     generatedBy: Optional[str] = Field(None, description="User who generated the document")
     requestedAt: Optional[str] = Field(None, description="Timestamp when request was made")
     purpose: Optional[str] = Field(None, description="Purpose of document generation")
 
+class DeploymentTableData(BaseModel):
+    data: DynamicTableData = Field(..., description="Table data with tag, headers, rows, etc.")
+
 class GenerateDocumentRequest(BaseModel):
     documentIsOld: int = Field(..., description="0 for new document, 1 for existing document update")
     documentName: str = Field(..., description="Document filename (required for both new and existing documents)")
     driveId: Optional[str] = Field(None, description="Drive ID for new documents (required when documentIsOld=0)")
     placeholders: Dict[str, Union[str, int, float]] = Field(..., description="Key-value pairs for text replacement")
-    data: Optional[DynamicTableData] = Field(None, description="Dynamic table data to generate and insert into document")
+    data: Optional[DynamicTableData] = Field(None, description="Dynamic table data to generate and insert into document (legacy single table support)")
+    deploymentTables: Optional[List[DeploymentTableData]] = Field(None, description="Multiple deployment tables to generate and insert into document")
     projectBrief: Optional[ProjectBriefData] = Field(None, description="Project brief table data to generate and insert into document")
     meta: Optional[RequestMetadata] = Field(None, description="Request metadata")
     
