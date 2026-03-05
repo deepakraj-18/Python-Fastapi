@@ -165,7 +165,9 @@ def _generate_legend_table(doc, legend, color_map):
     # Add legend rows
     for legend_item in legend:
         phase_name = legend_item.get('phase', '')
-        phase_color = legend_item.get('color', color_map.get(phase_name, '#FFFFFF'))
+        # look up colour using normalised key so legend entries remain
+        # case‑insensitive as well
+        phase_color = legend_item.get('color', color_map.get(phase_name.strip().lower(), '#FFFFFF'))
         
         row = legend_table.add_row()
         cell = row.cells[0]
@@ -190,10 +192,23 @@ def find_sdt_by_title(doc: Document, title: str):
 
 
 def parse_color_mapping(colors):
+    """Create a lookup mapping from phase name to color.
+
+    Phases coming from the request payload are not guaranteed to use a
+    consistent case/whitespace pattern (e.g. "Planning phase" vs
+    "Planning Phase").  Previous logic stored the keys verbatim, which
+    meant that later comparisons failed when the cases disagreed and no
+    shading was applied.  To make the matching robust we normalise all
+    keys to lowercase and strip surrounding whitespace.
+    """
     cmap = {}
     for c in colors or []:
         for k, v in c.items():
-            cmap[k] = v.get("color") if isinstance(v, dict) else v
+            key = k.strip().lower()
+            if isinstance(v, dict):
+                cmap[key] = v.get("color")
+            else:
+                cmap[key] = v
     return cmap
 def detect_table_format(rows, headers, colors):
     if not rows:
@@ -245,7 +260,22 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
         sdt_content.append(table._tbl)
 
     elif table_format == 'custom':
-        max_cols = 8 if is_deployment else MAX_DYNAMIC_COLS
+        # determine how many dynamic columns we should allow when building the table(s).
+        # for non-deployment use the global MAX_DYNAMIC_COLS value.  when the data
+        # represents deployment information we previously hard‑coded 8, but the
+        # requirement has changed: if there is only **one** deployment table in the
+        # document we should behave exactly like a normal table (i.e. allow the full
+        # MAX_DYNAMIC_COLS), otherwise restrict each table to 8 columns so that
+        # multiple deployment tables can coexist comfortably.
+        if is_deployment:
+            total_tables = data.get("deploymentTableCount", 1)
+            if total_tables > 1:
+                max_cols = 8
+            else:
+                max_cols = MAX_DYNAMIC_COLS
+        else:
+            max_cols = MAX_DYNAMIC_COLS
+
         tables = _generate_custom_table(doc, headers, rows, color_map, header_color, legend, max_cols)
         
         for i, table in enumerate(tables):
@@ -301,25 +331,25 @@ def _generate_phase_based_table(doc, rows, color_map, header_color):
         data_row = table.add_row()
         data_cells = data_row.cells
         phase = r.get('phaseType') or r.get('phase')
+        phase_key = phase.strip().lower() if isinstance(phase, str) else None
         
         for idx, h in enumerate(headers):
             cell = data_cells[idx]
             cell.text = str(r.get(h, ''))
             
-            if idx == 0:  # S.No.
+            if idx == 0:  
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
-            elif idx == 1:  # Staff
+            elif idx == 1:  
                 set_cell_font(cell, STAFF_FONT_SIZE, False)
                 align_cell(cell, 'left')
-            else:  # Other columns
+            else: 
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
             
-            if phase and phase in color_map:
-                set_cell_shading(cell, color_map[phase])
+            if phase_key and phase_key in color_map:
+                set_cell_shading(cell, color_map[phase_key])
     
-    # Enforce column widths
     enforce_column_widths(table, 2, len(headers) - 2, False)
     
     return table
@@ -477,8 +507,9 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
                 set_cell_vertical_alignment(cell, 'top')
             else:
                 phase = month_info.get('phase')
-                if phase and phase in color_map:
-                    set_cell_shading(cell, color_map[phase])
+                phase_key = phase.strip().lower() if isinstance(phase, str) else None
+                if phase_key and phase_key in color_map:
+                    set_cell_shading(cell, color_map[phase_key])
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
                 set_cell_vertical_alignment(cell, 'top')

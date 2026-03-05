@@ -76,6 +76,7 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
         deployment_tables = None
         if request.deploymentTables:
             deployment_tables = []
+            total = len(request.deploymentTables)
             for idx, table_item in enumerate(request.deploymentTables):
                 try:
                     tbl = {
@@ -85,7 +86,11 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                         "colors": table_item.data.colors,
                         "legend": table_item.data.legend,
                         "headerColor": table_item.data.headerColor,
-                        "isDeployment": True
+                        "isDeployment": True,
+                        # let the table generation logic know how many deployment
+                        # tables will be rendered in this document so that the
+                        # column limit rule can be applied correctly
+                        "deploymentTableCount": total,
                     }
                     deployment_tables.append(tbl)
                 except Exception as ex:
