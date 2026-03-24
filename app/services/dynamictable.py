@@ -562,7 +562,7 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
         cell = totals_cells[col_idx]
 
         if col_idx == 0: 
-            cell.text = str(len(rows) + 1)
+            cell.text = "" if has_total_in_this_table else str(len(rows) + 1)
             set_cell_font(cell, DEFAULT_FONT_SIZE, False)
             align_cell(cell, 'center')
             set_cell_vertical_alignment(cell, 'center')
