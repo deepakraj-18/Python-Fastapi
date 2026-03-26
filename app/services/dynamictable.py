@@ -1,6 +1,6 @@
 from docx import Document
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
+from docx.oxml import OxmlElement, parse_xml
+from docx.oxml.ns import qn, nsdecls
 from docx.shared import Pt, Inches, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -20,9 +20,15 @@ TOTAL_COL_WIDTH = Cm(1.6)
 
 def set_cell_shading(cell, color_hex: str):
     tcPr = cell._tc.get_or_add_tcPr()
-    shd = OxmlElement('w:shd')
-    shd.set(qn("w:val"), "clear")
-    shd.set(qn("w:fill"), color_hex.replace("#", ""))
+    for child in list(tcPr):
+        if child.tag == qn("w:shd"):
+            tcPr.remove(child)
+
+    normalized = str(color_hex).strip().strip("'").strip('"').replace("#", "")
+    if not normalized:
+        return
+
+    shd = parse_xml(r'<w:shd {} w:val="clear" w:color="auto" w:fill="{}"/>'.format(nsdecls('w'), normalized))
     tcPr.append(shd)
 
 def set_cell_text_bold(cell):
@@ -47,7 +53,6 @@ def align_cell(cell, align='center'):
         p.alignment = alignment_map.get(align, WD_ALIGN_PARAGRAPH.CENTER)
 
 def set_cell_vertical_alignment(cell, valign='center'):
-    """Set vertical alignment for cell"""
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
     vAlign = OxmlElement('w:vAlign')
@@ -55,7 +60,6 @@ def set_cell_vertical_alignment(cell, valign='center'):
     tcPr.append(vAlign)
 
 def set_cell_margins(cell, top=0, bottom=0, left=0, right=0):
-    """Set cell margins in points"""
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
     
@@ -63,29 +67,29 @@ def set_cell_margins(cell, top=0, bottom=0, left=0, right=0):
     
     if top > 0:
         top_mar = OxmlElement('w:top')
-        top_mar.set(qn('w:w'), str(int(top * 20)))  # Convert points to twentieths of a point
+        top_mar.set(qn('w:w'), str(int(top * 20)))
         top_mar.set(qn('w:type'), 'dxa')
         tcMar.append(top_mar)
     
     if bottom > 0:
         bottom_mar = OxmlElement('w:bottom')
-        bottom_mar.set(qn('w:w'), str(int(bottom * 20)))  # Convert points to twentieths of a point
+        bottom_mar.set(qn('w:w'), str(int(bottom * 20))) 
         bottom_mar.set(qn('w:type'), 'dxa')
         tcMar.append(bottom_mar)
     
     if left > 0:
         left_mar = OxmlElement('w:left')
-        left_mar.set(qn('w:w'), str(int(left * 20)))  # Convert points to twentieths of a point
+        left_mar.set(qn('w:w'), str(int(left * 20)))  
         left_mar.set(qn('w:type'), 'dxa')
         tcMar.append(left_mar)
     
     if right > 0:
         right_mar = OxmlElement('w:right')
-        right_mar.set(qn('w:w'), str(int(right * 20)))  # Convert points to twentieths of a point
+        right_mar.set(qn('w:w'), str(int(right * 20)))  
         right_mar.set(qn('w:type'), 'dxa')
         tcMar.append(right_mar)
     
-    if tcMar.getchildren():  # Only append if there are margin elements
+    if tcMar.getchildren(): 
         tcPr.append(tcMar)
 
 def set_cell_width(cell, width_cm):
@@ -192,15 +196,6 @@ def find_sdt_by_title(doc: Document, title: str):
 
 
 def parse_color_mapping(colors):
-    """Create a lookup mapping from phase name to color.
-
-    Phases coming from the request payload are not guaranteed to use a
-    consistent case/whitespace pattern (e.g. "Planning phase" vs
-    "Planning Phase").  Previous logic stored the keys verbatim, which
-    meant that later comparisons failed when the cases disagreed and no
-    shading was applied.  To make the matching robust we normalise all
-    keys to lowercase and strip surrounding whitespace.
-    """
     cmap = {}
     for c in colors or []:
         for k, v in c.items():
@@ -416,6 +411,7 @@ def _generate_custom_table(doc, headers, rows, color_map, header_color, legend, 
     tables = []
     
     if len(month_headers) > max_dynamic_cols:
+        is_paginated_table = True
         for chunk_idx in range(0, len(month_headers), max_dynamic_cols):
             chunk = month_headers[chunk_idx:chunk_idx + max_dynamic_cols]
             print(f"[DynamicTable] chunk {chunk_idx // max_dynamic_cols}: {chunk}")
@@ -425,11 +421,11 @@ def _generate_custom_table(doc, headers, rows, color_map, header_color, legend, 
             if has_total and is_last_chunk and len(chunk) < max_dynamic_cols:
                 table_headers = static_headers[:2] + chunk + ['Total']
                 table = _create_single_table(doc, table_headers, rows, color_map, header_color, 
-                                           chunk, True, chunk_idx > 0)
+                                           chunk, True, is_paginated_table)
             else:
                 table_headers = static_headers[:2] + chunk
                 table = _create_single_table(doc, table_headers, rows, color_map, header_color, 
-                                           chunk, False, chunk_idx > 0)
+                                           chunk, False, is_paginated_table)
             
             tables.append(table)
         
@@ -450,6 +446,7 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
     table = doc.add_table(rows=0, cols=len(table_headers))
     table.style = "Table Grid"
     set_table_width_and_alignment(table)
+    total_col_idx = len(table_headers) - 1 if has_total_in_this_table and table_headers else None
 
     header_row = table.add_row()
     header_cells = header_row.cells
@@ -457,7 +454,12 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
     for idx, header_text in enumerate(table_headers):
         cell = header_cells[idx]
         cell.text = str(header_text)
-        set_cell_shading(cell, header_color)
+        header_key = str(header_text).strip().lower()
+        is_total_col = header_key == 'total' or (total_col_idx is not None and idx == total_col_idx)
+        if is_total_col:
+            set_cell_shading(cell, '#FFF2CC')
+        else:
+            set_cell_shading(cell, header_color)
         set_cell_text_bold(cell)
         set_cell_font(cell, HEADER_FONT_SIZE, True)
         set_cell_vertical_alignment(cell, 'center')
@@ -480,16 +482,19 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
 
         for col_idx, header in enumerate(table_headers):
             cell = data_cells[col_idx]
+            header_key = str(header).strip().lower()
+            is_total_col = header_key == 'total' or (total_col_idx is not None and col_idx == total_col_idx)
 
             if col_idx == 0:
                 cell_value = str(row_idx + 1)
             elif col_idx == 1:
                 cell_value = row_data.get(header, '')
-            elif header == 'Total':
+            elif is_total_col:
                 cell_value = row_data.get(header, '')
             else:
                 month_info = month_map.get(header, {})
-                cell_value = month_info.get('value', '')
+                month_value = month_info.get('value', '')
+                cell_value = month_value if str(month_value).strip() else '-'
 
             cell.text = str(cell_value)
 
@@ -501,10 +506,11 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
                 set_cell_font(cell, STAFF_FONT_SIZE, False)
                 align_cell(cell, 'left')
                 set_cell_vertical_alignment(cell, 'top')
-            elif header == 'Total':
+            elif is_total_col:
                 set_cell_font(cell, DEFAULT_FONT_SIZE, True)
                 align_cell(cell, 'center')
                 set_cell_vertical_alignment(cell, 'top')
+                set_cell_shading(cell, '#FFF2CC')
             else:
                 phase = month_info.get('phase')
                 phase_key = phase.strip().lower() if isinstance(phase, str) else None
@@ -554,15 +560,16 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
     with ThreadPoolExecutor() as executor:
         column_totals = list(executor.map(calculate_column_total, table_headers[2:]))
         grand_total = calculate_grand_total()
-
     totals_row = table.add_row()
     totals_cells = totals_row.cells
 
     for col_idx, header in enumerate(table_headers):
         cell = totals_cells[col_idx]
-
+        header_key = str(header).strip().lower()
+        is_total_col = header_key == 'total' or (total_col_idx is not None and col_idx == total_col_idx)
+        set_cell_shading(cell, '#FFF2CC')
         if col_idx == 0: 
-            cell.text = "" if has_total_in_this_table else str(len(rows) + 1)
+            cell.text = "" if (is_split_table or has_total_in_this_table) else str(len(rows) + 1)
             set_cell_font(cell, DEFAULT_FONT_SIZE, False)
             align_cell(cell, 'center')
             set_cell_vertical_alignment(cell, 'center')
@@ -571,7 +578,7 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
             set_cell_font(cell, STAFF_FONT_SIZE, True)
             align_cell(cell, 'left')
             set_cell_vertical_alignment(cell, 'center')
-        elif header == 'Total':
+        elif is_total_col:
             cell.text = str(int(grand_total)) if grand_total == int(grand_total) else str(round(grand_total, 2))
             set_cell_font(cell, DEFAULT_FONT_SIZE, True)
             align_cell(cell, 'center')
@@ -587,11 +594,17 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
     num_month_cols = len(month_chunk)
     enforce_column_widths(table, num_static_cols, num_month_cols, has_total_in_this_table)
 
+    if total_col_idx is None:
+        total_col_idx = next((i for i, h in enumerate(table_headers) if str(h).strip().lower() == 'total'), None)
+    if total_col_idx is not None:
+        for row in table.rows:
+            if total_col_idx < len(row.cells):
+                set_cell_shading(row.cells[total_col_idx], '#FFF2CC')
+
     return table
 
 
 def find_all_sdt_by_title(doc: Document, title: str):
-    """Find all SDTs with the given title/tag"""
     sdts = []
     for el in doc.element.body.iter():
         if el.tag.endswith("sdt"):
@@ -605,22 +618,17 @@ def find_all_sdt_by_title(doc: Document, title: str):
     return sdts
 
 def set_table_dotted_border(table):
-    """Set dotted borders for the table"""
     tbl = table._tbl
     tblPr = tbl.tblPr
-    
-    # Set table borders
     tblBorders = OxmlElement('w:tblBorders')
     
-    # Define dotted border properties
     border_props = {
         'w:val': 'dotted',
-        'w:sz': '6',  # Border size
+        'w:sz': '6',  
         'w:space': '0',
-        'w:color': '000000'  # Black color
+        'w:color': '000000'  
     }
     
-    # Apply to all borders
     for border_name in ['w:top', 'w:left', 'w:bottom', 'w:right', 'w:insideH', 'w:insideV']:
         border = OxmlElement(border_name)
         for prop, value in border_props.items():
