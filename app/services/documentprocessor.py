@@ -2,6 +2,9 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import io
+import os
+import platform
+import tempfile
 from typing import Dict, Union, Any, Optional
 from .dynamictable import generate_dynamic_table
 
@@ -15,10 +18,64 @@ class DocumentProcessor:
         return Document(file_stream)
 
     def save_document(self, doc: Document) -> io.BytesIO:
-        output_stream = io.BytesIO()
-        doc.save(output_stream)
-        output_stream.seek(0)
-        return output_stream
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                temp_path = tmp.name
+
+            doc.save(temp_path)
+            self._update_word_fields_and_toc(temp_path)
+
+            with open(temp_path, "rb") as f:
+                output_stream = io.BytesIO(f.read())
+
+            output_stream.seek(0)
+            return output_stream
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+
+    def _update_word_fields_and_toc(self, docx_path: str) -> None:
+        if platform.system().lower() != "windows":
+            return
+
+        try:
+            import pythoncom
+            import win32com.client as win32
+        except Exception:
+            return
+
+        word = None
+        com_initialized = False
+
+        try:
+            pythoncom.CoInitialize()
+            com_initialized = True
+
+            word = win32.gencache.EnsureDispatch("Word.Application")
+            word.Visible = False
+            word.DisplayAlerts = 0
+
+            wdoc = word.Documents.Open(
+                docx_path,
+                ReadOnly=False,
+                AddToRecentFiles=False,
+            )
+
+            wdoc.Fields.Update()
+            for i in range(1, wdoc.TablesOfContents.Count + 1):
+                wdoc.TablesOfContents(i).Update()
+
+            wdoc.Save()
+            wdoc.Close(SaveChanges=False)
+        finally:
+            if word is not None:
+                word.Quit()
+            if com_initialized:
+                pythoncom.CoUninitialize()
 
     def replace_tags(self, doc: Document, placeholders: Dict[str, Union[str, int, float]]) -> Document:
         nsmap = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
