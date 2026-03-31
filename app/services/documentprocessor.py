@@ -2,71 +2,19 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import io
-import os
-import subprocess
-import tempfile
 from typing import Dict, Union, Any, Optional
 from .dynamictable import generate_dynamic_table
 
 class DocumentProcessor:
-    def __init__(self):
-        self.update_word_fields = os.getenv("WORD_UPDATE_FIELDS", "0") == "1"
-
     def load_document(self, file_stream: io.BytesIO) -> Document:
         file_stream.seek(0)
         return Document(file_stream)
 
     def save_document(self, doc: Document) -> io.BytesIO:
-        if not self.update_word_fields:
-            output_stream = io.BytesIO()
-            doc.save(output_stream)
-            output_stream.seek(0)
-            return output_stream
-
-        temp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                temp_path = tmp.name
-
-            doc.save(temp_path)
-            self._update_word_fields_and_toc(temp_path)
-
-            with open(temp_path, "rb") as f:
-                output_stream = io.BytesIO(f.read())
-
-            output_stream.seek(0)
-            return output_stream
-        finally:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except Exception:
-                    pass
-
-    def _update_word_fields_and_toc(self, docx_path: str) -> None:
-        """Update fields and TOC using LibreOffice (Linux/Azure)"""
-        try:
-            output_dir = os.path.dirname(docx_path)
-            subprocess.run(
-                [
-                    "libreoffice",
-                    "--headless",
-                    "--invisible",
-                    "--norestore",
-                    "--convert-to", "docx",
-                    "--outdir", output_dir,
-                    docx_path
-                ],
-                timeout=60,
-                capture_output=True,
-                check=False
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            # LibreOffice not available or timeout - skip field updates gracefully
-            pass
-        except Exception:
-            # Any other error - skip silently
-            pass
+        output_stream = io.BytesIO()
+        doc.save(output_stream)
+        output_stream.seek(0)
+        return output_stream
 
     def replace_tags(self, doc: Document, placeholders: Dict[str, Union[str, int, float]]) -> Document:
         nsmap = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
