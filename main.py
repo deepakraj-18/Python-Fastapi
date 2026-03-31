@@ -90,18 +90,14 @@ async def generate_document(request: GenerateDocumentRequest, token_payload: dic
         
         table_data = None
         deployment_tables = None
-        # Support legacy single table and new deploymentTables
         if hasattr(request, "deploymentTables") and request.deploymentTables:
             deployment_tables = []
-            for idx, table_item in enumerate(request.deploymentTables):
-                print(f"[MainRoute] processing table_item {idx}: {table_item!r}")
-                # table_item may be a pydantic model or dict
+            for table_item in request.deploymentTables:
                 try:
                     data_obj = table_item.data if hasattr(table_item, "data") else table_item.get("data")
                 except Exception:
                     data_obj = None
                 if data_obj:
-                    # Convert to simple dict
                     if hasattr(data_obj, "dict"):
                         data_dict = data_obj.dict()
                     elif isinstance(data_obj, dict):
@@ -109,8 +105,6 @@ async def generate_document(request: GenerateDocumentRequest, token_payload: dic
                     else:
                         data_dict = {}
                     deployment_tables.append(data_dict)
-                else:
-                    print(f"[MainRoute] warning: table_item {idx} has no data field")
         elif request.data:
             table_data = {
                 "tag": getattr(request.data, "tag", "table"),

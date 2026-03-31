@@ -1,16 +1,12 @@
 from fastapi import APIRouter, HTTPException, status
-from typing import Dict, Any
+from typing import Any
 from datetime import datetime
-import io
-import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.requestmodel import GenerateDocumentRequest
 from models.responsemodel import GenerateDocumentResponse, ErrorResponse, SharePointMetadata
 
-from services.sharepoint import SharePointUtils
-from services.documentprocessor import DocumentProcessor
-from services.imageservice import generate_chart_image
+from app.services.sharepoint import SharePointUtils
+from app.services.documentprocessor import DocumentProcessor
 
 router = APIRouter()
 
@@ -19,7 +15,6 @@ router = APIRouter()
              summary="Generate or update Word document",
              description="Generate a new document from template or update existing document with placeholders and charts")
 async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumentResponse:
-    
     try:
         sharepoint = SharePointUtils()
         doc_processor = DocumentProcessor()
@@ -46,22 +41,6 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                 detail="documentIsOld must be 0 (new) or 1 (existing)"
             )
 
-        chart_images: Dict[str, io.BytesIO] = {}
-        
-        if request.charts:
-            for chart in request.charts:
-                try:
-                    if chart.chartType.lower() in ["table", "dynamic_table"]:
-                        chart_image = generate_chart_image(chart.data, chart.title)
-                        chart_images[chart.tag] = chart_image
-                    else:
-                        chart_image = generate_chart_image(chart.data, chart.title)
-                        chart_images[chart.tag] = chart_image
-                        
-                except Exception as e:
-                    continue
-
-        # Handle legacy single table data
         table_data = None
         if request.data:
             table_data = {
@@ -87,16 +66,12 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
                         "legend": table_item.data.legend,
                         "headerColor": table_item.data.headerColor,
                         "isDeployment": True,
-                        # let the table generation logic know how many deployment
-                        # tables will be rendered in this document so that the
-                        # column limit rule can be applied correctly
                         "deploymentTableCount": total,
                     }
                     deployment_tables.append(tbl)
-                except Exception as ex:
-                    print(f"[Route] failed to convert table_item {idx}: {ex}")
-        
-        
+                except Exception:
+                    continue
+
         project_brief_data = None
         if request.projectBrief:
             project_brief_data = {
@@ -107,7 +82,7 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
         processed_document = doc_processor.process_document(
             document_stream, 
             request.placeholders, 
-            chart_images,
+            None,
             table_data,
             project_brief_data,
             deployment_tables
@@ -138,7 +113,7 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
         
         return response
         
-    except HTTPException as http_exc:
+    except HTTPException:
         raise
 
     except Exception as e:

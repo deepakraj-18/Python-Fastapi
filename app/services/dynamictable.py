@@ -5,7 +5,6 @@ from docx.shared import Pt, Inches, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from typing import Dict, List, Any, Optional
-from concurrent.futures import ThreadPoolExecutor
 
 MAX_DYNAMIC_COLS = 16
 STAFF_FONT_SIZE = Pt(12)
@@ -95,20 +94,33 @@ def set_cell_margins(cell, top=0, bottom=0, left=0, right=0):
 def set_cell_width(cell, width_cm):
     tcPr = cell._tc.get_or_add_tcPr()
     tcW = OxmlElement('w:tcW')
-    tcW.set(qn('w:w'), str(int(width_cm.cm * 567)))  # Convert cm to twentieths of a point
+    tcW.set(qn('w:w'), str(int(width_cm.cm * 567)))
     tcW.set(qn('w:type'), 'dxa')
     tcPr.append(tcW)
+
+def set_row_height(row, height_cm):
+    row_elem = row._tr
+    trPr = row_elem.get_or_add_trPr()
+
+    for child in list(trPr):
+        if child.tag == qn("w:trHeight"):
+            trPr.remove(child)
+
+    trHeight = OxmlElement('w:trHeight')
+    trHeight.set(qn('w:val'), str(int(height_cm.cm * 567)))
+    trHeight.set(qn('w:type'), 'dxa')
+    trPr.append(trHeight)
+
+
 
 def set_table_width_and_alignment(table):
     tbl = table._tbl
     tblPr = tbl.tblPr
     
-    # Set table alignment to center
     tblJc = OxmlElement('w:jc')
     tblJc.set(qn('w:val'), 'center')
     tblPr.append(tblJc)
     
-    # Set fixed table layout to respect column widths
     tblLayout = OxmlElement('w:tblLayout')
     tblLayout.set(qn('w:type'), 'fixed')
     tblPr.append(tblLayout)
@@ -118,7 +130,7 @@ def enforce_column_widths(table, num_static_cols=2, num_month_cols=0, has_total=
         if len(table.columns) > 1:
             table.columns[0].width = SERIAL_COL_WIDTH
             table.columns[1].width = STAFF_COL_WIDTH
-            
+
             for i in range(2, len(table.columns)):
                 if has_total and i == len(table.columns) - 1:
                     table.columns[i].width = TOTAL_COL_WIDTH
@@ -145,13 +157,6 @@ def add_row_with_color(table, values, color=None):
         if color:
             set_cell_shading(row[i], color)
 
-def add_table_spacing(doc, space_before_pt=12, space_after_pt=12):
-    p = doc.add_paragraph()
-    p.space_before = Pt(space_before_pt)
-    p.space_after = Pt(0)
-    
-    return p  
-
 def _generate_legend_table(doc, legend, color_map):
     if not legend:
         return None
@@ -160,17 +165,13 @@ def _generate_legend_table(doc, legend, color_map):
     legend_table.style = "Table Grid"
     set_table_width_and_alignment(legend_table)
     
-    # Set column width for legend
     try:
-        legend_table.columns[0].width = Cm(4.0)  # Phase name column
+        legend_table.columns[0].width = Cm(4.0)
     except:
         pass
-    
-    # Add legend rows
+
     for legend_item in legend:
         phase_name = legend_item.get('phase', '')
-        # look up colour using normalised key so legend entries remain
-        # case‑insensitive as well
         phase_color = legend_item.get('color', color_map.get(phase_name.strip().lower(), '#FFFFFF'))
         
         row = legend_table.add_row()
@@ -216,7 +217,6 @@ def detect_table_format(rows, headers, colors):
 
 
 def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Document:
-    
     headers = data.get("headers", [])
     rows = data.get("rows", [])
     colors = data.get("colors", [])
@@ -230,19 +230,11 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
     if not rows:
         return doc
 
-    print(f"[DynamicTable] tag={tag}, is_deployment={is_deployment}, header_color={header_color}")
     color_map = parse_color_mapping(colors)
     table_format = detect_table_format(rows, headers, colors)
 
     sdt = find_sdt_by_title(doc, tag)
     if sdt is None:
-        for el in doc.element.body.iter():
-            if el.tag.endswith("sdt"):
-                for child in el.iter():
-                    if child.tag.endswith("tag"):
-                        existing_tag = child.get(qn("w:val"))
-                    elif child.tag.endswith("alias"):
-                        existing_alias = child.get(qn("w:val"))
         return doc
 
     sdt_content = next(el for el in sdt.iter() if el.tag.endswith("sdtContent"))
@@ -255,13 +247,6 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
         sdt_content.append(table._tbl)
 
     elif table_format == 'custom':
-        # determine how many dynamic columns we should allow when building the table(s).
-        # for non-deployment use the global MAX_DYNAMIC_COLS value.  when the data
-        # represents deployment information we previously hard‑coded 8, but the
-        # requirement has changed: if there is only **one** deployment table in the
-        # document we should behave exactly like a normal table (i.e. allow the full
-        # MAX_DYNAMIC_COLS), otherwise restrict each table to 8 columns so that
-        # multiple deployment tables can coexist comfortably.
         if is_deployment:
             total_tables = data.get("deploymentTableCount", 1)
             if total_tables > 1:
@@ -274,7 +259,7 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
         tables = _generate_custom_table(doc, headers, rows, color_map, header_color, legend, max_cols)
         
         for i, table in enumerate(tables):
-            if i > 0: 
+            if i > 0:
                 spacing_p = doc.add_paragraph()
                 spacing_p.space_before = Pt(12)
                 spacing_p.space_after = Pt(6)
@@ -308,19 +293,22 @@ def _generate_phase_based_table(doc, rows, color_map, header_color):
     
     header_row = table.add_row()
     header_cells = header_row.cells
+
+    set_row_height(header_row, Cm(0.6))
+    
     for idx, header in enumerate(headers):
         cell = header_cells[idx]
         cell.text = str(header)
         set_cell_shading(cell, header_color)
         set_cell_text_bold(cell)
         set_cell_font(cell, HEADER_FONT_SIZE, True)
-        
+
         if idx == 0:
-            align_cell(cell, 'center')  
+            align_cell(cell, 'center')
         elif idx == 1:
-            align_cell(cell, 'left')    
+            align_cell(cell, 'left')
         else:
-            align_cell(cell, 'center')  
+            align_cell(cell, 'center')
     
     for r in rows:
         data_row = table.add_row()
@@ -331,14 +319,14 @@ def _generate_phase_based_table(doc, rows, color_map, header_color):
         for idx, h in enumerate(headers):
             cell = data_cells[idx]
             cell.text = str(r.get(h, ''))
-            
-            if idx == 0:  
+
+            if idx == 0:
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
-            elif idx == 1:  
+            elif idx == 1:
                 set_cell_font(cell, STAFF_FONT_SIZE, False)
                 align_cell(cell, 'left')
-            else: 
+            else:
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
             
@@ -359,19 +347,22 @@ def _generate_simple_table(doc, rows, color_map, header_color):
     
     header_row = table.add_row()
     header_cells = header_row.cells
+
+    set_row_height(header_row, Cm(0.6))
+    
     for idx, header in enumerate(headers):
         cell = header_cells[idx]
         cell.text = str(header)
         set_cell_shading(cell, header_color)
         set_cell_text_bold(cell)
         set_cell_font(cell, HEADER_FONT_SIZE, True)
-        
+
         if idx == 0:
-            align_cell(cell, 'center')  
+            align_cell(cell, 'center')
         elif idx == 1:
-            align_cell(cell, 'left')    
+            align_cell(cell, 'left')
         else:
-            align_cell(cell, 'center')  
+            align_cell(cell, 'center')
     
     for r in rows:
         data_row = table.add_row()
@@ -380,14 +371,14 @@ def _generate_simple_table(doc, rows, color_map, header_color):
         for idx, h in enumerate(headers):
             cell = data_cells[idx]
             cell.text = str(r.get(h, ''))
-            
-            if idx == 0: 
+
+            if idx == 0:
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
-            elif idx == 1:  
+            elif idx == 1:
                 set_cell_font(cell, STAFF_FONT_SIZE, False)
                 align_cell(cell, 'left')
-            else:  
+            else:
                 set_cell_font(cell, DEFAULT_FONT_SIZE, False)
                 align_cell(cell, 'center')
     
@@ -397,14 +388,11 @@ def _generate_simple_table(doc, rows, color_map, header_color):
 
 
 def _generate_custom_table(doc, headers, rows, color_map, header_color, legend, max_dynamic_cols=MAX_DYNAMIC_COLS):
-    # debug output to help understand pagination behavior
-    print(f"[DynamicTable] _generate_custom_table called with max_dynamic_cols={max_dynamic_cols}")
     all_months_set = set()
     for row in rows:
         for month_obj in row.get('months', []):
             all_months_set.update(month_obj.keys())
-    
-    # Use headers order to maintain chronological order
+
     month_headers = [h for h in headers if h in all_months_set]
     static_headers = [h for h in headers if h not in all_months_set]
     has_total = 'Total' in static_headers
@@ -414,29 +402,29 @@ def _generate_custom_table(doc, headers, rows, color_map, header_color, legend, 
         is_paginated_table = True
         for chunk_idx in range(0, len(month_headers), max_dynamic_cols):
             chunk = month_headers[chunk_idx:chunk_idx + max_dynamic_cols]
-            print(f"[DynamicTable] chunk {chunk_idx // max_dynamic_cols}: {chunk}")
+            row_offset = chunk_idx + 1
             remaining_months_after_this_chunk = len(month_headers) - (chunk_idx + len(chunk))
             is_last_chunk = remaining_months_after_this_chunk == 0
             
             if has_total and is_last_chunk and len(chunk) < max_dynamic_cols:
                 table_headers = static_headers[:2] + chunk + ['Total']
                 table = _create_single_table(doc, table_headers, rows, color_map, header_color, 
-                                           chunk, True, is_paginated_table)
+                                           chunk, True, is_paginated_table, row_offset)
             else:
                 table_headers = static_headers[:2] + chunk
                 table = _create_single_table(doc, table_headers, rows, color_map, header_color, 
-                                           chunk, False, is_paginated_table)
+                                           chunk, False, is_paginated_table, row_offset)
             
             tables.append(table)
         
         if has_total and len(month_headers) % max_dynamic_cols == 0:
             total_table_headers = static_headers[:2] + ['Total']
             total_table = _create_single_table(doc, total_table_headers, rows, color_map, header_color, 
-                                             [], True, True)
+                                             [], True, True, 0)
             tables.append(total_table)
     else:
         table = _create_single_table(doc, headers, rows, color_map, header_color, 
-                                   month_headers, has_total, False)
+                                   month_headers, has_total, False, 1)
         tables.append(table)
     
     return tables
@@ -448,14 +436,61 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
     set_table_width_and_alignment(table)
     total_col_idx = len(table_headers) - 1 if has_total_in_this_table and table_headers else None
 
+    numbering_row = table.add_row()
+    numbering_cells = numbering_row.cells
+    set_row_height(numbering_row, Cm(0.5))
+    
+    month_col_counter = row_offset
+    for idx, header_text in enumerate(table_headers):
+        cell = numbering_cells[idx]
+        header_key = str(header_text).strip().lower()
+        is_total_col = header_key == 'total' or (total_col_idx is not None and idx == total_col_idx)
+        
+        if idx < 2:
+            cell.text = ""
+            set_cell_shading(cell, header_color)
+        elif is_total_col:
+            cell.text = ""
+            set_cell_shading(cell, '#FFF2CC')
+        else:
+            cell.text = str(month_col_counter)
+            month_col_counter += 1
+            set_cell_shading(cell, header_color)
+        
+        set_cell_font(cell, Pt(8), True)
+        align_cell(cell, 'center')
+        set_cell_vertical_alignment(cell, 'center')
+
     header_row = table.add_row()
     header_cells = header_row.cells
+    
+    # Set header row height to be reduced
+    set_row_height(header_row, Cm(0.6))
 
     for idx, header_text in enumerate(table_headers):
         cell = header_cells[idx]
-        cell.text = str(header_text)
         header_key = str(header_text).strip().lower()
         is_total_col = header_key == 'total' or (total_col_idx is not None and idx == total_col_idx)
+
+        if idx < 2 or is_total_col:
+            merged_cell = numbering_cells[idx].merge(cell)
+            merged_cell.text = str(header_text)
+            if is_total_col:
+                set_cell_shading(merged_cell, '#FFF2CC')
+            else:
+                set_cell_shading(merged_cell, header_color)
+            set_cell_text_bold(merged_cell)
+            set_cell_font(merged_cell, HEADER_FONT_SIZE, True)
+            set_cell_vertical_alignment(merged_cell, 'center')
+            if idx == 0:
+                align_cell(merged_cell, 'center')
+            elif idx == 1:
+                align_cell(merged_cell, 'left')
+            else:
+                align_cell(merged_cell, 'center')
+            continue
+
+        cell.text = str(header_text)
         if is_total_col:
             set_cell_shading(cell, '#FFF2CC')
         else:
@@ -464,15 +499,16 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
         set_cell_font(cell, HEADER_FONT_SIZE, True)
         set_cell_vertical_alignment(cell, 'center')
 
-        if idx == 0:  
+        if idx == 0:
             align_cell(cell, 'center')
-        elif idx == 1:  
+        elif idx == 1:
             align_cell(cell, 'left')
-        else:  
+        else:
             align_cell(cell, 'center')
 
     for row_idx, row_data in enumerate(rows):
         data_row = table.add_row()
+        set_row_height(data_row, Cm(0.5))
         data_cells = data_row.cells
 
         month_map = {}
@@ -528,39 +564,29 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
                 month_map[month_name] = month_info
         month_maps.append(month_map)
 
-    def calculate_column_total(header):
-        column_total = 0.0
+    def _to_float(value):
+        try:
+            if isinstance(value, str):
+                candidate = value.strip()
+                return float(candidate) if candidate else 0.0
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+
+    column_totals = []
+    for header in table_headers[2:]:
+        col_total = 0.0
         for month_map in month_maps:
             month_info = month_map.get(header, {})
-            try:
-                value = month_info.get('value', 0)
-                if isinstance(value, str):
-                    value = float(value) if value.replace('.', '').replace('-', '').isdigit() else 0.0
-                else:
-                    value = float(value)
-                column_total += value
-            except (ValueError, TypeError):
-                pass
-        return column_total
+            col_total += _to_float(month_info.get('value', 0))
+        column_totals.append(col_total)
 
-    def calculate_grand_total():
-        grand_total = 0.0
-        for row_data in rows:
-            try:
-                total_val = row_data.get('Total', 0)
-                if isinstance(total_val, str):
-                    total_val = float(total_val) if total_val.replace('.', '').replace('-', '').isdigit() else 0.0
-                else:
-                    total_val = float(total_val)
-                grand_total += total_val
-            except (ValueError, TypeError):
-                pass
-        return grand_total
+    grand_total = 0.0
+    for row_data in rows:
+        grand_total += _to_float(row_data.get('Total', 0))
 
-    with ThreadPoolExecutor() as executor:
-        column_totals = list(executor.map(calculate_column_total, table_headers[2:]))
-        grand_total = calculate_grand_total()
     totals_row = table.add_row()
+    set_row_height(totals_row, Cm(0.5))
     totals_cells = totals_row.cells
 
     for col_idx, header in enumerate(table_headers):
@@ -590,7 +616,7 @@ def _create_single_table(doc, table_headers, rows, color_map, header_color,
             align_cell(cell, 'center')
             set_cell_vertical_alignment(cell, 'center')
 
-    num_static_cols = 2  
+    num_static_cols = 2
     num_month_cols = len(month_chunk)
     enforce_column_widths(table, num_static_cols, num_month_cols, has_total_in_this_table)
 

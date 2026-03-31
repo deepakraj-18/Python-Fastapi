@@ -9,15 +9,20 @@ from typing import Dict, Union, Any, Optional
 from .dynamictable import generate_dynamic_table
 
 class DocumentProcessor:
-    
     def __init__(self):
-        pass
+        self.update_word_fields = os.getenv("WORD_UPDATE_FIELDS", "0") == "1"
 
     def load_document(self, file_stream: io.BytesIO) -> Document:
         file_stream.seek(0)
         return Document(file_stream)
 
     def save_document(self, doc: Document) -> io.BytesIO:
+        if not self.update_word_fields:
+            output_stream = io.BytesIO()
+            doc.save(output_stream)
+            output_stream.seek(0)
+            return output_stream
+
         temp_path = None
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
@@ -136,7 +141,6 @@ class DocumentProcessor:
                         deployment_tables: Optional[list] = None) -> io.BytesIO:
         doc = self.load_document(document_stream)
         doc = self.replace_tags(doc, placeholders)
-
 
         if deployment_tables:
             for table in deployment_tables:
