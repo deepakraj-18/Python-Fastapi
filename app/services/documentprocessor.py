@@ -3,7 +3,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import io
 import os
-import platform
+import subprocess
 import tempfile
 from typing import Dict, Union, Any, Optional
 from .dynamictable import generate_dynamic_table
@@ -44,43 +44,29 @@ class DocumentProcessor:
                     pass
 
     def _update_word_fields_and_toc(self, docx_path: str) -> None:
-        if platform.system().lower() != "windows":
-            return
-
+        """Update fields and TOC using LibreOffice (Linux/Azure)"""
         try:
-            import pythoncom
-            import win32com.client as win32
-        except Exception:
-            return
-
-        word = None
-        com_initialized = False
-
-        try:
-            pythoncom.CoInitialize()
-            com_initialized = True
-
-            word = win32.gencache.EnsureDispatch("Word.Application")
-            word.Visible = False
-            word.DisplayAlerts = 0
-
-            wdoc = word.Documents.Open(
-                docx_path,
-                ReadOnly=False,
-                AddToRecentFiles=False,
+            output_dir = os.path.dirname(docx_path)
+            subprocess.run(
+                [
+                    "libreoffice",
+                    "--headless",
+                    "--invisible",
+                    "--norestore",
+                    "--convert-to", "docx",
+                    "--outdir", output_dir,
+                    docx_path
+                ],
+                timeout=60,
+                capture_output=True,
+                check=False
             )
-
-            wdoc.Fields.Update()
-            for i in range(1, wdoc.TablesOfContents.Count + 1):
-                wdoc.TablesOfContents(i).Update()
-
-            wdoc.Save()
-            wdoc.Close(SaveChanges=False)
-        finally:
-            if word is not None:
-                word.Quit()
-            if com_initialized:
-                pythoncom.CoUninitialize()
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            # LibreOffice not available or timeout - skip field updates gracefully
+            pass
+        except Exception:
+            # Any other error - skip silently
+            pass
 
     def replace_tags(self, doc: Document, placeholders: Dict[str, Union[str, int, float]]) -> Document:
         nsmap = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
