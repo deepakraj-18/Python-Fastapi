@@ -38,13 +38,23 @@ class DocumentProcessor:
             
             if matching_key:
                 replacement_value = str(placeholders[matching_key])
-                
-                if '\\n' in replacement_value or '\n' in replacement_value:
+
+                if '\n' in replacement_value or '\n' in replacement_value:
                     self._replace_text_with_breaks(sdt, replacement_value, nsmap)
                 else:
                     text_el = sdt.find(".//w:t", namespaces=nsmap)
+                    run_el = sdt.find(".//w:r", namespaces=nsmap)
                     if text_el is not None:
                         text_el.text = replacement_value
+                        if run_el is not None:
+                            rPr = run_el.find(".//w:rPr", namespaces=nsmap)
+                            if rPr is None:
+                                rPr = OxmlElement('w:rPr')
+                                run_el.insert(0, rPr)
+                            b_el = rPr.find(".//w:b", namespaces=nsmap)
+                            if b_el is None:
+                                b_el = OxmlElement('w:b')
+                                rPr.append(b_el)
 
         return doc
     
@@ -52,18 +62,27 @@ class DocumentProcessor:
         run_el = sdt.find(".//w:r", namespaces=nsmap)
         if run_el is None:
             return
-        
+
         for text_el in run_el.findall(".//w:t", namespaces=nsmap):
             run_el.remove(text_el)
-        
+
+        rPr = run_el.find(".//w:rPr", namespaces=nsmap)
+        if rPr is None:
+            rPr = OxmlElement('w:rPr')
+            run_el.insert(0, rPr)
+        b_el = rPr.find(".//w:b", namespaces=nsmap)
+        if b_el is None:
+            b_el = OxmlElement('w:b')
+            rPr.append(b_el)
+
         lines = text.replace('\\n', '\n').split('\n')
-        
+
         for i, line in enumerate(lines):
             text_el = OxmlElement('w:t')
             text_el.set(qn('xml:space'), 'preserve')
             text_el.text = line
             run_el.append(text_el)
-            
+
             if i < len(lines) - 1:
                 br_el = OxmlElement('w:br')
                 run_el.append(br_el)
