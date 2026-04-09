@@ -221,11 +221,10 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
     rows = data.get("rows", [])
     colors = data.get("colors", [])
     legend = data.get("legend", [])
-    is_deployment = data.get("isDeployment", False)
     if "headerColor" in data and data.get("headerColor") is not None:
         header_color = data.get("headerColor")
     else:
-        header_color = "#FFFFFF" if is_deployment else "#333399"
+        header_color = "#333399"
 
     if not rows:
         return doc
@@ -247,24 +246,15 @@ def generate_dynamic_table(doc: Document, tag: str, data: Dict[str, Any]) -> Doc
         sdt_content.append(table._tbl)
 
     elif table_format == 'custom':
-        if is_deployment:
-            total_tables = data.get("deploymentTableCount", 1)
-            if total_tables > 1:
-                max_cols = 8
-            else:
-                max_cols = MAX_DYNAMIC_COLS
-        else:
-            max_cols = MAX_DYNAMIC_COLS
-
+        max_cols = data.get("customMaxCols", MAX_DYNAMIC_COLS)
         tables = _generate_custom_table(doc, headers, rows, color_map, header_color, legend, max_cols)
-        
+
         for i, table in enumerate(tables):
             if i > 0:
                 spacing_p = doc.add_paragraph()
                 spacing_p.space_before = Pt(12)
                 spacing_p.space_after = Pt(6)
                 sdt_content.append(spacing_p._element)
-            
             sdt_content.append(table._tbl)
 
     else:

@@ -23,6 +23,7 @@ class DeploymentTableData(BaseModel):
 
 class GenerateDocumentRequest(BaseModel):
     documentIsOld: int = Field(..., description="0 for new document, 1 for existing document update")
+    isPortraitPage: Optional[Union[int, bool]] = Field(None, description="Portrait layout flag: true/1 uses 8 max dynamic columns, false/0 uses 16")
     documentName: str = Field(..., description="Document filename (required for both new and existing documents)")
     driveId: Optional[str] = Field(None, description="Drive ID for new documents (required when documentIsOld=0)")
     placeholders: Dict[str, Union[str, int, float]] = Field(..., description="Key-value pairs for text replacement")

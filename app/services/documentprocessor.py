@@ -91,14 +91,24 @@ class DocumentProcessor:
                         chart_images: Optional[Dict[str, io.BytesIO]] = None,
                         table_data: Optional[Dict[str, Any]] = None,
                         project_brief_data: Optional[Dict[str, Any]] = None,
-                        deployment_tables: Optional[list] = None) -> io.BytesIO:
+                        deployment_tables: Optional[list] = None,
+                        isPortraitPage: Optional[bool] = None) -> io.BytesIO:
         doc = self.load_document(document_stream)
         doc = self.replace_tags(doc, placeholders)
 
+        # Determine threshold based on isPortraitPage
+        threshold_cols = 8 if isPortraitPage or isPortraitPage == 1 else 16
+
         if deployment_tables:
             for table in deployment_tables:
-                tag = table.get("tag", "table")
-                doc = generate_dynamic_table(doc, tag, table)
+                if isinstance(table, dict) and "data" in table and isinstance(table["data"], dict):
+                    table["data"]["customMaxCols"] = threshold_cols
+                    tag = table["data"].get("tag", "table")
+                    doc = generate_dynamic_table(doc, tag, table["data"])
+                else:
+                    table["customMaxCols"] = threshold_cols
+                    tag = table.get("tag", "table")
+                    doc = generate_dynamic_table(doc, tag, table)
         elif table_data:
             tag = table_data.get("tag", "table")
             doc = generate_dynamic_table(doc, tag, table_data)

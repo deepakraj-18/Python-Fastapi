@@ -129,7 +129,8 @@ async def generate_document(request: GenerateDocumentRequest, token_payload: dic
                 None,
                 table_data,
                 project_brief_data,
-                deployment_tables
+                deployment_tables,
+                request.isPortraitPage
             )
         except Exception as processing_error:
             raise HTTPException(
