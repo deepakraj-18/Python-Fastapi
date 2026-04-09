@@ -719,7 +719,7 @@ def generate_project_brief_table(doc: Document, tag: str, data: Dict[str, Any]) 
             align_cell(cells[0], 'left')
             align_cell(cells[1], 'left')
             set_cell_font(cells[0], STAFF_FONT_SIZE, name="Century Gothic")
-            set_cell_font(cells[1], STAFF_FONT_SIZE, name="Century Gothic")
+            set_cell_font(cells[1], STAFF_FONT_SIZE, bold=True, name="Century Gothic")
             set_cell_margins(cells[0], bottom=5)
             set_cell_margins(cells[1], bottom=5)
 
