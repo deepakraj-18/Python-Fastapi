@@ -4,9 +4,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-from models.requestmodel import GenerateDocumentRequest
-from models.responsemodel import GenerateDocumentResponse, SharePointMetadata
+from models.requestmodel import GenerateDocumentRequest, GeneratePDFRequest
+from models.responsemodel import GenerateDocumentResponse, SharePointMetadata, GeneratePDFResponse
 import uvicorn
+
 
 app = FastAPI(
     title="Document Generator API",
@@ -215,13 +216,105 @@ async def generate_document(request: GenerateDocumentRequest, token_payload: dic
             detail=f"Document processing failed: {str(e)}"
         )
 
+@app.post("/api/generatepdf",
+         response_model=GeneratePDFResponse,
+         summary="Convert DOCX to PDF and upload to SharePoint",
+         description="Download DOCX from SharePoint, convert to PDF using docx2pdf, and upload PDF back to SharePoint")
+async def generate_pdf(request: GeneratePDFRequest, token_payload: dict = Depends(verify_jwt)) -> GeneratePDFResponse:
+
+    try:
+        from app.services.sharepoint import SharePointUtils
+        from app.services.pdfconverter import PDFConverter
+        
+        sharepoint = SharePointUtils()
+        if not request.documentName:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="documentName is required (e.g., '/Templates/ANP_PSL_CPMC_R1.docx')"
+            )
+        
+        if not request.driveId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="driveId is required"
+            )
+        
+        if not request.fileName:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="fileName is required (output PDF name without .pdf extension)"
+            )
+        
+        try:
+            docx_stream = sharepoint.download_file_by_path_with_drive(
+                request.documentName,
+                request.driveId
+            )
+        except Exception as download_error:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Failed to download DOCX from SharePoint: {str(download_error)}"
+            )
+
+        # Convert DOCX stream to PDF via docx2pdf
+        try:
+            pdf_stream = PDFConverter.convert_docx_to_pdf(docx_stream, request.fileName)
+        except Exception as conversion_error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"DOCX to PDF conversion failed: {str(conversion_error)}"
+            )
+        try:
+            pdf_filename = f"{request.fileName}.pdf"
+            upload_response = sharepoint.upload_new_file(
+                pdf_stream,
+                pdf_filename,
+                folder_path="/Output"
+            )
+        except Exception as upload_error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload PDF to SharePoint: {str(upload_error)}"
+            )
+        try:
+            metadata = sharepoint.extract_metadata(upload_response)
+            
+            response = GeneratePDFResponse(
+                status="success",
+                message="DOCX successfully converted to PDF and uploaded to SharePoint",
+                documentName=metadata["fileName"],
+                sharepointUrl=metadata["webUrl"],
+                fileId=metadata["fileId"],
+                size=metadata["size"],
+                processedAt=datetime.utcnow().isoformat()
+            )
+            
+            return response
+        except Exception as metadata_error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to extract upload metadata: {str(metadata_error)}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PDF generation failed: {str(e)}"
+        )
+
+
 @app.get("/")
 async def root():
     return {
         "message": "Document Generator API", 
         "status": "running",
         "docs": "/docs",
-        "generate_endpoint": "/api/generatedocument"
+        "endpoints": {
+            "generate_document": "/api/generatedocument",
+            "generate_pdf": "/api/generatepdf"
+        }
     }
 
 @app.get("/health")

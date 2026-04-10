@@ -54,3 +54,27 @@ class ErrorResponse(BaseModel):
                 "processedAt": "2025-11-04T10:30:00Z"
             }
         }
+
+
+class GeneratePDFResponse(BaseModel):
+    status: str = Field(..., description="Operation status: 'success' or 'failure'")
+    message: str = Field(..., description="Human-readable message about the operation")
+    documentName: str = Field(..., description="Name of the converted PDF document")
+    sharepointUrl: str = Field(..., description="Direct URL to access the PDF in SharePoint")
+    fileId: Optional[str] = Field(None, description="SharePoint file ID of the PDF")
+    size: Optional[int] = Field(None, description="File size in bytes")
+    processedAt: str = Field(default_factory=lambda: datetime.utcnow().isoformat(), description="Processing completion timestamp")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "success",
+                "message": "DOCX successfully converted to PDF and uploaded to SharePoint",
+                "documentName": "Test.pdf",
+                "sharepointUrl": "https://company.sharepoint.com/sites/docs/Output/Test.pdf",
+                "fileId": "PDF123456",
+                "size": 512000,
+                "processedAt": "2025-11-04T10:30:00Z"
+            }
+        }
+

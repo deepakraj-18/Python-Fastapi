@@ -377,3 +377,19 @@ class GenerateDocumentRequest(BaseModel):
             }
         }
 
+
+class GeneratePDFRequest(BaseModel):
+    """Request model for DOCX to PDF conversion and SharePoint upload"""
+    documentName: str = Field(..., description="Document name in SharePoint (e.g., '/Templates/ANP_PSL_CPMC_R1.docx')")
+    driveId: str = Field(..., description="SharePoint Drive ID containing the document")
+    fileName: str = Field(..., description="Output PDF filename (without .pdf extension)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "fileName": "Output",
+                "documentName": "/Templates/ANP_PSL_CPMC_R1.docx",
+                "driveId": "b!LLTsCOpdiE2htadxu50J82rygom69uVDiFijc__3FBg5Ec6om2DWR6vKVIYE4jsw"
+            }
+        }
+

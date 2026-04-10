@@ -3,10 +3,17 @@ import requests
 import io
 from typing import Dict, Any, Optional
 import os
+import threading
 from datetime import datetime, timedelta
 from app.config.config import settings
 
 class SharePointUtils:
+    _shared_app = None
+    _shared_token: Optional[str] = None
+    _shared_token_expires_at: Optional[datetime] = None
+    _shared_app_lock = threading.Lock()
+    _shared_token_lock = threading.Lock()
+
     def __init__(self):
         self.tenant_id = settings.TENANT_ID
         self.client_id = settings.CLIENT_ID
@@ -18,29 +25,38 @@ class SharePointUtils:
         self.scopes = ["https://graph.microsoft.com/.default"]
         self.site_url = settings.SITE_URL
         self.site_id = settings.SITE_ID
-        self._app = msal.ConfidentialClientApplication(
-            self.client_id,
-            authority=self.authority,
-            client_credential=self.client_secret,
-        )
-        self._token: Optional[str] = None
-        self._token_expires_at: Optional[datetime] = None
+
+        if SharePointUtils._shared_app is None:
+            with SharePointUtils._shared_app_lock:
+                if SharePointUtils._shared_app is None:
+                    SharePointUtils._shared_app = msal.ConfidentialClientApplication(
+                        self.client_id,
+                        authority=self.authority,
+                        client_credential=self.client_secret,
+                    )
+
+        self._app = SharePointUtils._shared_app
         self._session = requests.Session()
         self._timeout = 30
 
     def get_access_token(self):
-        if self._token and self._token_expires_at:
-            if datetime.utcnow() < (self._token_expires_at - timedelta(seconds=60)):
-                return self._token
+        if SharePointUtils._shared_token and SharePointUtils._shared_token_expires_at:
+            if datetime.utcnow() < (SharePointUtils._shared_token_expires_at - timedelta(seconds=60)):
+                return SharePointUtils._shared_token
 
-        result = self._app.acquire_token_for_client(scopes=self.scopes)
-        if "access_token" not in result:
-            raise Exception(f"Token Error: {result.get('error_description')}")
+        with SharePointUtils._shared_token_lock:
+            if SharePointUtils._shared_token and SharePointUtils._shared_token_expires_at:
+                if datetime.utcnow() < (SharePointUtils._shared_token_expires_at - timedelta(seconds=60)):
+                    return SharePointUtils._shared_token
 
-        self._token = result["access_token"]
-        expires_in = int(result.get("expires_in", 3600))
-        self._token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-        return self._token
+            result = self._app.acquire_token_for_client(scopes=self.scopes)
+            if "access_token" not in result:
+                raise Exception(f"Token Error: {result.get('error_description')}")
+
+            expires_in = int(result.get("expires_in", 3600))
+            SharePointUtils._shared_token = result["access_token"]
+            SharePointUtils._shared_token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            return SharePointUtils._shared_token
 
     def _auth_headers(self) -> Dict[str, str]:
         token = self.get_access_token()
