@@ -7,7 +7,6 @@ from models.responsemodel import GenerateDocumentResponse, ErrorResponse, ShareP
 
 from app.services.sharepoint import SharePointUtils
 from app.services.documentprocessor import DocumentProcessor
-from app.services.pdfconverter import PDFConverter
 
 router = APIRouter()
 
@@ -133,7 +132,7 @@ async def generate_document(request: GenerateDocumentRequest) -> GenerateDocumen
     "/generatepdf",
     response_model=GeneratePDFResponse,
     summary="Convert DOCX to PDF and upload to SharePoint",
-    description="Download DOCX from SharePoint, convert to PDF using docx2pdf, and upload PDF back to SharePoint",
+    description="Convert DOCX to PDF using Microsoft Graph and upload PDF back to SharePoint",
 )
 async def generate_pdf(request: GeneratePDFRequest) -> GeneratePDFResponse:
     try:
@@ -158,18 +157,10 @@ async def generate_pdf(request: GeneratePDFRequest) -> GeneratePDFResponse:
             )
 
         try:
-            docx_stream = sharepoint.download_file_by_path_with_drive(
+            pdf_stream = sharepoint.convert_docx_to_pdf_with_graph(
                 request.documentName,
                 request.driveId,
             )
-        except Exception as download_error:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Failed to download DOCX from SharePoint: {str(download_error)}",
-            )
-
-        try:
-            pdf_stream = PDFConverter.convert_docx_to_pdf(docx_stream, request.fileName)
         except Exception as conversion_error:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

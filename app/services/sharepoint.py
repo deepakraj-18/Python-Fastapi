@@ -92,6 +92,25 @@ class SharePointUtils:
             return self._download_file_alternative_with_drive(sharepoint_path, token, drive_id)
         return io.BytesIO(response.content)
 
+    def convert_docx_to_pdf_with_graph(self, sharepoint_path: str, drive_id: str) -> io.BytesIO:
+        token = self.get_access_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/pdf",
+        }
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:{sharepoint_path}:/content?format=pdf"
+
+        response = self._session.get(url, headers=headers, timeout=self._timeout)
+        if response.status_code != 200:
+            error_text = (response.text or "").replace("\r", " ").replace("\n", " ").strip()
+            if len(error_text) > 500:
+                error_text = error_text[:500] + "..."
+            raise Exception(
+                f"Graph DOCX to PDF conversion failed. Status: {response.status_code}, Error: {error_text}"
+            )
+
+        return io.BytesIO(response.content)
+
     def _download_file_alternative(self, sharepoint_path: str, token: str) -> io.BytesIO:
         headers = {"Authorization": f"Bearer {token}"}
         url = f"https://graph.microsoft.com/v1.0/sites/{self.site_id}/drive/root:{sharepoint_path}:/content"
